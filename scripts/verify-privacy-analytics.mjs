@@ -348,7 +348,25 @@ try {
   const provider = read("components/analytics/AnalyticsProvider.tsx");
   assert(provider.includes("doNotTrack"), "Analytics provider must respect Do Not Track.");
   assert(provider.includes("PUBLIC_ANALYTICS_ROUTES"), "Analytics provider must use a public route allowlist.");
-  assert(provider.includes("get_public_analytics_setting") || client.includes("get_public_analytics_setting"), "Analytics setting RPC must be used.");
+  const settingRoute = read("app/api/analytics/setting/route.ts");
+  const publicReadRpc = read("lib/public-site/read-public-rpc.ts");
+  const announcementsRoute = read("app/api/public/announcements/route.ts");
+  assert(
+    client.includes('fetch("/api/analytics/setting"') &&
+      settingRoute.includes('readPublicRpc("get_public_analytics_setting")') &&
+      publicReadRpc.includes('"get_public_analytics_setting"'),
+    "Analytics setting must use the allowlisted same-origin public RPC without client SDK.",
+  );
+  assert(
+    announcementsRoute.includes('readPublicRpc("get_public_announcements")') &&
+      publicReadRpc.includes('"get_public_announcements"'),
+    "Public announcements must use the same allowlisted read-only RPC boundary.",
+  );
+  assert(
+    !client.includes("@/lib/supabase/client") &&
+      !client.includes("createClient("),
+    "Initial public analytics must not eagerly load Supabase browser SDK.",
+  );
   assert(provider.includes("availability") && provider.includes("\"loading\""), "Analytics provider must expose loading availability.");
   assert(provider.includes("enabled") && provider.includes("ready"), "Analytics provider must expose enabled and ready booleans.");
   assert(provider.includes("providerTrackDecision"), "Analytics provider must use the typed decision helper.");

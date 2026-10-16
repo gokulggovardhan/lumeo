@@ -51,9 +51,14 @@ export function AnnouncementBanner() {
     // empty -- never blocks or breaks the page it's mounted on.
     async function load() {
       try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const { data, error } = await createClient().rpc("get_public_announcements");
-        if (cancelled || error || !Array.isArray(data)) return;
+        const response = await fetch("/api/public/announcements", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (cancelled || !response.ok) return;
+        const data: unknown = await response.json();
+        if (cancelled || !Array.isArray(data)) return;
         setAnnouncements(data.map(parseAnnouncement).filter((item): item is PublicAnnouncement => item !== null));
       } catch {
         // no-op

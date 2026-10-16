@@ -1,9 +1,7 @@
 "use client";
-
-import { createClient } from "@/lib/supabase/client";
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
-const REQUEST_TIMEOUT_MS = 2500;
+const REQUEST_TIMEOUT_MS = 3000;
 const DELIVERY_TIMEOUT_MS = 8000;
 
 // Delivery is serialized per browser page so the first successful event can
@@ -12,11 +10,6 @@ const DELIVERY_TIMEOUT_MS = 8000;
 // first-visit race from creating two pseudonymous visitors for one person.
 // Callers never await this queue for PDF work; analytics remains best effort.
 let deliveryQueue: Promise<void> = Promise.resolve();
-
-type RpcResult<T> = {
-  data: T | null;
-  error: unknown;
-};
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -38,15 +31,24 @@ function safeDuration(value: number | null | undefined) {
 
 export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
   try {
-    const supabase = createClient();
-    const { data, error } = await withTimeout(
-      supabase.rpc("get_public_analytics_setting") as unknown as Promise<
-        RpcResult<boolean>
-      >,
+    // The public setting is resolved by an explicit same-origin, read-only API.
+    // Avoid loading the full Supabase browser SDK into the initial public shell.
+    const response = await withTimeout(
+      fetch("/api/analytics/setting", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      }),
       REQUEST_TIMEOUT_MS,
     );
-    if (error || typeof data !== "boolean") return false;
-    return data;
+    if (!response.ok) return false;
+    const payload: unknown = await response.json();
+    return Boolean(
+      payload &&
+        typeof payload === "object" &&
+        "enabled" in payload &&
+        payload.enabled === true,
+    );
   } catch {
     return false;
   }
