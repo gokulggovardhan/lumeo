@@ -86,7 +86,7 @@ function CompactToolCard({
     "group flex min-h-[4.4rem] w-full items-center gap-2.5 rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 py-2.5 text-left sm:min-h-[4.75rem] sm:gap-3 sm:px-3.5 sm:py-3 shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none";
 
   return (
-    <li className="min-w-0">
+    <li className="min-w-0 [content-visibility:auto] [contain-intrinsic-size:auto_90px]">
       <ScrollReveal index={index} className="h-full">
         {available ? (
           <Link
@@ -117,7 +117,7 @@ function CompactToolCard({
 
 function AllToolsTile({ label }: { label: string }) {
   return (
-    <li className="min-w-0">
+    <li className="min-w-0 [content-visibility:auto] [contain-intrinsic-size:auto_90px]">
       <Link
         href="/pdf-tools"
         prefetch={false}
