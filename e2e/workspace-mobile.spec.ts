@@ -103,6 +103,12 @@ test("upload once can switch tools immediately and Finish exports the latest mat
     page.getByRole("heading", { name: "PDF Workspace", exact: true }),
   ).toBeVisible();
 
+  const journey = page.locator('[data-workspace-onboarding="true"]');
+  await expect(journey).toHaveAttribute("data-workspace-onboarding-stage", "upload");
+  await expect(journey.locator('[data-workspace-step="upload"]')).toHaveAttribute(
+    "aria-current", "step",
+  );
+
   const upload = page
     .locator('input[type="file"][data-upload-client-ready="true"]')
     .first();
@@ -112,6 +118,16 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   await expect(
     page.getByRole("heading", { name: "Choose your next step.", exact: true }),
   ).toBeVisible({ timeout: 30_000 });
+  await expect(journey).toHaveAttribute("data-workspace-onboarding-stage", "work");
+  await expect(journey.locator('[data-workspace-step="upload"]')).toHaveAttribute(
+    "data-workspace-step-status", "complete",
+  );
+  await expect(journey.locator('[data-workspace-step="work"]')).toHaveAttribute(
+    "aria-current", "step",
+  );
+  await expect(journey.locator('[data-workspace-step="finish"]')).toHaveAttribute(
+    "data-workspace-step-status", "upcoming",
+  );
   await page.getByRole("button", { name: /^Pages/ }).click();
   await expect(page).toHaveURL(/\/pdf\/organize$/);
 
@@ -172,6 +188,14 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   // auto-materialized, so persistent Workspace navigation must use it.
   await clickWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
+  const finishJourney = page.locator('[data-workspace-onboarding="true"]');
+  await expect(finishJourney).toHaveAttribute("data-workspace-onboarding-stage", "finish");
+  await expect(finishJourney.locator('[data-workspace-step="finish"]')).toHaveAttribute(
+    "aria-current", "step",
+  );
+  await expect(finishJourney.locator('[data-workspace-step="work"]')).toHaveAttribute(
+    "data-workspace-step-status", "complete",
+  );
   await expect(identity).toHaveAttribute("data-workspace-revision-number", String(savedRevision));
   await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
   // Client-side tool navigation preserves the dirty Workspace and its guard.

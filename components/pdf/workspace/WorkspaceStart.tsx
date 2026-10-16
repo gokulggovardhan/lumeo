@@ -19,6 +19,7 @@ import {
   isPdfNamedFile,
 } from "@/lib/pdf/uploadValidation";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
+import { WorkspaceJourney } from "./WorkspaceJourney";
 
 type PreparedPdf = {
   fileName: string;
@@ -166,6 +167,7 @@ export function WorkspaceStart({ intro }: { intro: ReactNode }) {
     <section className="grid gap-4 sm:gap-5">
       <div className="rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-4 shadow-[var(--v2-elevation-2)] sm:p-6">
         {intro}
+        <WorkspaceJourney stage={ready ? "work" : "upload"} />
 
         {!ready ? (
           <div className="mt-5 sm:mt-6">

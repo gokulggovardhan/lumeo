@@ -11,6 +11,7 @@ import {
 } from "@/lib/pdf/workspace/session";
 import { visibleWorkspaceHistory } from "@/lib/pdf/workspace/presentation";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
+import { WorkspaceJourney } from "./WorkspaceJourney";
 
 function outputName(value: string): string {
   return `${sanitizeFileStem(value.replace(/\.pdf$/i, ""), "lumeo-finished")}.pdf`;
@@ -155,6 +156,8 @@ export function WorkspaceFinish() {
             label={`Revision ${currentDocument.revision.number}`}
           />
         </div>
+
+        <WorkspaceJourney stage="finish" />
 
         <div className="grid gap-5 pt-5 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.75fr)]">
           <div>

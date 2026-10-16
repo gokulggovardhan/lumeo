@@ -349,12 +349,21 @@ test("production connected Workspace preserves a real Pages change through Edit 
     await expect(
       page.getByRole("heading", { name: "PDF Workspace", exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+    const journey = page.locator('[data-workspace-onboarding="true"]');
+    await expect(journey).toHaveAttribute("data-workspace-onboarding-stage", "upload");
+    await expect(journey.locator('[data-workspace-step="upload"]')).toHaveAttribute(
+      "aria-current", "step",
+    );
 
     const upload = await waitForL2UploadReady(page);
     await upload.setInputFiles(TWO_PAGE_PDF);
     await expect(
       page.getByRole("heading", { name: "Choose your next step.", exact: true }),
     ).toBeVisible({ timeout: 30_000 });
+    await expect(journey).toHaveAttribute("data-workspace-onboarding-stage", "work");
+    await expect(journey.locator('[data-workspace-step="work"]')).toHaveAttribute(
+      "aria-current", "step",
+    );
     await page.getByRole("button", { name: /^Pages/ }).click();
     await expect(page).toHaveURL(/\/pdf\/organize$/);
   } else {
@@ -393,6 +402,11 @@ test("production connected Workspace preserves a real Pages change through Edit 
   await clickPersistentWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
   await expect(page.getByRole("heading", { name: "Finish", exact: true })).toBeVisible();
+  const finishJourney = page.locator('[data-workspace-onboarding="true"]');
+  await expect(finishJourney).toHaveAttribute("data-workspace-onboarding-stage", "finish");
+  await expect(finishJourney.locator('[data-workspace-step="finish"]')).toHaveAttribute(
+    "aria-current", "step",
+  );
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF", exact: true }).click();
