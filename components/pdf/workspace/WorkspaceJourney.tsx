@@ -32,7 +32,7 @@ export function WorkspaceJourney({ stage }: { stage: WorkspaceJourneyStage }) {
             className={[
               "min-w-0 rounded-[var(--radius-lg)] border px-2 py-2.5 sm:px-3",
               current
-                ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                ? "border-[var(--border-selected)] bg-[var(--surface-base)]"
                 : "border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.025)]",
             ].join(" ")}
           >
@@ -42,7 +42,7 @@ export function WorkspaceJourney({ stage }: { stage: WorkspaceJourneyStage }) {
                 className={[
                   "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black",
                   current || completed
-                    ? "bg-[var(--surface-selected)] text-[var(--text-accent)]"
+                    ? "bg-[var(--surface-elevated)] text-[var(--text-accent)]"
                     : "bg-[var(--surface-base)] text-[var(--text-muted)]",
                 ].join(" ")}
               >
