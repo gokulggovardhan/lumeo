@@ -224,7 +224,7 @@ export function WorkspaceStart({ intro }: { intro: ReactNode }) {
 
       <section
         aria-labelledby="workspace-first-step"
-        className="rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-4 shadow-[var(--v2-elevation-1)] sm:p-6"
+        className="rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-4 shadow-[var(--v2-elevation-1)] sm:p-6 [content-visibility:auto] [contain-intrinsic-size:auto_250px]"
       >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
