@@ -41,7 +41,7 @@ export default function PublicFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <L2PublicFooter className="aura-public-footer bg-[linear-gradient(180deg,rgba(32,36,31,0.72),rgba(17,19,16,0.96))] px-5 text-sm text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] sm:px-8">
+    <L2PublicFooter className="aura-public-footer [content-visibility:auto] [contain-intrinsic-size:auto_460px] bg-[linear-gradient(180deg,rgba(32,36,31,0.72),rgba(17,19,16,0.96))] px-5 text-sm text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] sm:px-8">
       <div className="mx-auto grid max-w-[1160px] gap-8 py-9 md:grid-cols-[1.15fr_2fr]">
         <div>
           <BrandLockup markSize="h-10 w-10" />
