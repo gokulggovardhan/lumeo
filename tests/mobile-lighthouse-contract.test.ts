@@ -241,9 +241,19 @@ test("non-visual public services do not preload Supabase before first paint", ()
     /from "@\/lib\/supabase\/client"/,
     "Announcement Supabase code must not be a static dependency of every public page.",
   );
-  assert.match(
+  assert.doesNotMatch(
     announcements,
     /import\("@\/lib\/supabase\/client"\)/,
-    "Announcement data access should load on demand after first paint.",
+    "Announcement service must not load the browser Supabase SDK.",
+  );
+  assert.match(
+    announcements,
+    /fetch\("\/api\/public\/announcements"/,
+    "Announcement data access should use a same-origin, read-only endpoint.",
+  );
+  assert.match(
+    announcements,
+    /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(\(\) => \{/,
+    "Announcement data access should remain deferred until after first paint.",
   );
 });
