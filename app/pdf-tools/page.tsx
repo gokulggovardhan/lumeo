@@ -74,7 +74,7 @@ export default function PdfToolsPage() {
         <PublicToolsExplorer />
       </Suspense>
 
-      <div className="mt-8">
+      <div className="mt-8 [content-visibility:auto] [contain-intrinsic-size:auto_200px]">
         <PublicFooter />
       </div>
     </PublicCatalogPageShell>
