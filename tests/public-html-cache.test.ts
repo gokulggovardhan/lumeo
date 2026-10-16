@@ -58,7 +58,7 @@ test("edge cache TTL stays bounded and browser response stays private/no-store",
     headers:{"content-type":"text/html","cache-control":"private, no-store"},
   });
   const entry = publicHtmlCacheStorageCopy(response);
-  assert.equal(await entry.text(),"public page");
+  assert.equal(await entry.clone().text(),"public page");
   assert.equal(entry.headers.get("cache-control"),"public, max-age=180");
   const visitor = publicHtmlCacheBrowserCopy(entry);
   assert.equal(await visitor.text(),"public page");
