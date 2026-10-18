@@ -276,18 +276,18 @@ test("Lumeo 2 public interaction spacing fixes are guarded", () => {
   assert.ok(ui.includes("l2-directory-card-surface"));
   assert.ok(css.includes(".l2-directory-card-surface"));
 
-  assert.ok(workspace.includes("type=\"file\""));
-  assert.ok(workspace.includes("accept={accept}"));
-  assert.ok(workspace.includes("multiple={multiple}"));
-  assert.ok(workspace.includes("inputRef.current?.click()"));
-  assert.ok(workspace.includes("event.currentTarget.files"));
-  assert.ok(workspace.includes("event.currentTarget.value = \"\""));
-  assert.ok(workspace.includes("onDragEnter={handleDragEnter}"));
-  assert.ok(workspace.includes("onDragOver={handleDragOver}"));
-  assert.ok(workspace.includes("onDragLeave={handleDragLeave}"));
-  assert.ok(workspace.includes("onDrop={handleDrop}"));
-  assert.ok(workspace.includes("event.preventDefault();"));
-  assert.ok(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"));
+  assert.ok(entryPrimitives.includes("type=\"file\""));
+  assert.ok(entryPrimitives.includes("accept={accept}"));
+  assert.ok(entryPrimitives.includes("multiple={multiple}"));
+  assert.ok(entryPrimitives.includes("inputRef.current?.click()"));
+  assert.ok(entryPrimitives.includes("event.currentTarget.files"));
+  assert.ok(entryPrimitives.includes("event.currentTarget.value = \"\""));
+  assert.ok(entryPrimitives.includes("onDragEnter={handleDragEnter}"));
+  assert.ok(entryPrimitives.includes("onDragOver={handleDragOver}"));
+  assert.ok(entryPrimitives.includes("onDragLeave={handleDragLeave}"));
+  assert.ok(entryPrimitives.includes("onDrop={handleDrop}"));
+  assert.ok(entryPrimitives.includes("event.preventDefault();"));
+  assert.ok(entryPrimitives.includes("onFilesSelected?.(event.dataTransfer.files)"));
 });
 
 test("Lumeo 2 directory and error states use public foundations", () => {
