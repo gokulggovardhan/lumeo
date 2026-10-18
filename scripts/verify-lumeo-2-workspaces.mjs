@@ -89,21 +89,22 @@ try {
   assert(css.includes("top: 96px"), "Desktop sticky settings offset is missing.");
   assert(css.includes("@media (max-width: 1023px)") && css.includes("position: static"), "Mobile sticky reset is missing.");
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
+  const entryPrimitives = read("components/pdf/workspace/WorkspaceEntryPrimitives.tsx");
   const publicCopy = read("lib/public-site/copy.ts");
   assert(publicCopy.includes("Files stay on your device · Local processing where supported"), "Shared local-first privacy copy is missing.");
-  assert(workspace.includes("LOCAL_FIRST_SHORT"), "Workspace privacy note must use the shared local-first copy.");
+  assert(entryPrimitives.includes("LOCAL_FIRST_SHORT"), "Workspace privacy note must use the shared local-first copy.");
   assert(css.includes("--atelier-sage-500") && css.includes("--atelier-brass-400"), "Atelier workspace palette is missing.");
-  assert(!workspace.includes("rgba(var(--sky-rgb)"), "Workspace shared primitives must not use blue/cyan focus accents.");
-  assert(workspace.includes("max-w-[560px]") && workspace.includes("text-[var(--text-muted)]"), "Workspace privacy note must be compact and secondary.");
-  assert(workspace.includes("type=\"file\""), "Shared upload primitive must render a real file input.");
-  assert(workspace.includes("accept={accept}"), "Shared upload primitive must pass the configured PDF accept value.");
-  assert(workspace.includes("multiple={multiple}"), "Shared upload primitive must control multiple-file behavior.");
-  assert(workspace.includes("inputRef.current?.click()"), "Shared upload primitive must open the native file chooser from the select action.");
-  assert(workspace.includes("event.currentTarget.files"), "Shared upload primitive must forward selected files.");
-  assert(workspace.includes("event.currentTarget.value = \"\""), "Shared upload primitive must reset the input value after selection.");
-  assert(workspace.includes("onDragEnter={handleDragEnter}") && workspace.includes("onDragOver={handleDragOver}") && workspace.includes("onDrop={handleDrop}"), "Shared upload primitive must own drag/drop handlers.");
-  assert(workspace.includes("event.dataTransfer.dropEffect = \"copy\""), "Shared upload primitive must mark file drops as copy operations.");
-  assert(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"), "Shared upload primitive must forward dropped files.");
+  assert(!workspace.includes("rgba(var(--sky-rgb)") && !entryPrimitives.includes("rgba(var(--sky-rgb)"), "Workspace shared primitives must not use blue/cyan focus accents.");
+  assert(entryPrimitives.includes("max-w-[560px]") && entryPrimitives.includes("text-[var(--text-muted)]"), "Workspace privacy note must be compact and secondary.");
+  assert(entryPrimitives.includes("type=\"file\""), "Shared upload primitive must render a real file input.");
+  assert(entryPrimitives.includes("accept={accept}"), "Shared upload primitive must pass the configured PDF accept value.");
+  assert(entryPrimitives.includes("multiple={multiple}"), "Shared upload primitive must control multiple-file behavior.");
+  assert(entryPrimitives.includes("inputRef.current?.click()"), "Shared upload primitive must open the native file chooser from the select action.");
+  assert(entryPrimitives.includes("event.currentTarget.files"), "Shared upload primitive must forward selected files.");
+  assert(entryPrimitives.includes("event.currentTarget.value = \"\""), "Shared upload primitive must reset the input value after selection.");
+  assert(entryPrimitives.includes("onDragEnter={handleDragEnter}") && entryPrimitives.includes("onDragOver={handleDragOver}") && entryPrimitives.includes("onDrop={handleDrop}"), "Shared upload primitive must own drag/drop handlers.");
+  assert(entryPrimitives.includes("event.dataTransfer.dropEffect = \"copy\""), "Shared upload primitive must mark file drops as copy operations.");
+  assert(entryPrimitives.includes("onFilesSelected?.(event.dataTransfer.files)"), "Shared upload primitive must forward dropped files.");
 
   for (const [name, source] of [
     ["MergePdfTool", mergeTool],
