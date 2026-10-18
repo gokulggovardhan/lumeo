@@ -109,7 +109,12 @@ try {
   }
 
   for (const component of toolFoundations) {
-    assert(new RegExp(`export function ${component}\\b`).test(workspace), `Missing tool workspace foundation: ${component}`);
+    const inline = new RegExp(`export function ${component}\\\\b`).test(workspace);
+    const entryPrimitives = read("components/pdf/workspace/WorkspaceEntryPrimitives.tsx");
+    const compatibleReexport = component === "ToolPrivacyNote" &&
+      workspace.includes('export { ToolPrivacyNote } from "./WorkspaceEntryPrimitives"') &&
+      /export function ToolPrivacyNote\\b/.test(entryPrimitives);
+    assert(inline || compatibleReexport, `Missing tool workspace foundation: ${component}`);
   }
 
 
