@@ -62,7 +62,14 @@ try {
     "L2ResultState",
     "L2PrivacyNote",
   ]) {
-    assert(workspace.includes(`export function ${component}`), `Missing workspace primitive: ${component}`);
+    const lightweightUpload =
+      component === "L2UploadStage" &&
+      workspace.includes('export { L2UploadStage } from "./WorkspaceEntryPrimitives"') &&
+      read("components/pdf/workspace/WorkspaceEntryPrimitives.tsx").includes("export function L2UploadStage");
+    assert(
+      workspace.includes(`export function ${component}`) || lightweightUpload,
+      `Missing workspace primitive: ${component}`,
+    );
     assert(tokens.includes(component), `Workspace token list missing: ${component}`);
   }
 
