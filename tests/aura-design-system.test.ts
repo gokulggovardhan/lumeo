@@ -9,6 +9,7 @@ function read(path: string) {
 const css = read("app/globals.css");
 const ui = read("components/ui/Aura.tsx");
 const workspace = read("components/pdf/workspace/ToolWorkspace.tsx");
+const entryPrimitives = read("components/pdf/workspace/WorkspaceEntryPrimitives.tsx");
 const homepage = read("app/page.tsx");
 const pdfTools = read("app/pdf-tools/page.tsx");
 const launcher = read("components/pdf/PdfToolLauncher.tsx");
@@ -156,7 +157,13 @@ test("reduced motion and high contrast support exist", () => {
 
 test("tool workspace foundations are present", () => {
   for (const name of ["ToolUploadStage", "ToolResultStage", "ToolPrivacyNote"]) {
-    assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
+    assert.ok(
+      workspace.includes(`export function ${name}`) ||
+        (["L2UploadStage", "ToolPrivacyNote"].includes(name) &&
+          workspace.includes(`export { ${name} } from "./WorkspaceEntryPrimitives"`) &&
+          entryPrimitives.includes(`export function ${name}`)),
+      `${name} should exist and remain available through the shared workspace`,
+    );
   }
 
   for (const name of [
@@ -178,7 +185,13 @@ test("tool workspace foundations are present", () => {
     "L2ResultState",
     "L2PrivacyNote",
   ]) {
-    assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
+    assert.ok(
+      workspace.includes(`export function ${name}`) ||
+        (["L2UploadStage", "ToolPrivacyNote"].includes(name) &&
+          workspace.includes(`export { ${name} } from "./WorkspaceEntryPrimitives"`) &&
+          entryPrimitives.includes(`export function ${name}`)),
+      `${name} should exist and remain available through the shared workspace`,
+    );
   }
 
 });
