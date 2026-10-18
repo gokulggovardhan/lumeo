@@ -118,9 +118,9 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   assert.ok(publicMenu.includes("{tile.description}"));
   assert.ok(publicMenu.includes("md:max-h-[70vh]"));
   assert.doesNotMatch(publicMenu, /md:grid-cols-2/);
-  assert.ok(workspace.includes("inputRef.current?.click()"));
-  assert.ok(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"));
-  assert.ok(workspace.includes("max-w-[560px]"));
+  assert.ok(entryPrimitives.includes("inputRef.current?.click()"));
+  assert.ok(entryPrimitives.includes("onFilesSelected?.(event.dataTransfer.files)"));
+  assert.ok(entryPrimitives.includes("max-w-[560px]"));
   // The LCP-critical hero heading preserves the former CSS-module typography
   // directly in the homepage utility classes, including its compact mobile
   // clamp and the >= sm desktop/tablet clamp.
