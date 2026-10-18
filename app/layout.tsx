@@ -9,14 +9,18 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-manrope",
   subsets: ["latin"],
-  display: "swap",
+  // Optional web font: don't repaint LCP text after a slow font download.
+  // System sans-serif remains legible until the branded font is available.
+  display: "optional",
 });
 
 const fraunces = Fraunces({
   variable: "--font-dm-serif",
   subsets: ["latin"],
   weight: "variable",
-  display: "swap",
+  // Preserve serif styling on fast/cache-warm devices, avoid a late swap
+  // becoming an additional text-LCP candidate on throttled mobile.
+  display: "optional",
 });
 
 const plexMono = IBM_Plex_Mono({
