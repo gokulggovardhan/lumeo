@@ -6,7 +6,7 @@ import { AuraButton, AuraStatus } from "@/components/ui/Aura";
 import {
   L2UploadStage,
   ToolPrivacyNote,
-} from "@/components/pdf/workspace/ToolWorkspace";
+} from "@/components/pdf/workspace/WorkspaceEntryPrimitives";
 import {
   continuationRouteForArea,
   type ContinuationArea,
