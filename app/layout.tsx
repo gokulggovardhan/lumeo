@@ -1,18 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { ErrorMonitor } from "@/components/errors/ErrorMonitor";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  // Optional web font: don't repaint LCP text after a slow font download.
-  // System sans-serif remains legible until the branded font is available.
-  display: "optional",
-});
 
 const fraunces = Fraunces({
   variable: "--font-dm-serif",
@@ -99,7 +91,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${fraunces.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <AnalyticsProvider>
