@@ -209,10 +209,16 @@ test("Edit PDF heavy client graph starts only after the first paint boundary", (
   assert.match(deferred, /ssr:\s*false/);
   assert.match(
     deferred,
-    /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(\(\) => \{[\s\S]*setReady\(true\)/,
-    "The heavy editor should begin only after two animation frames have allowed first paint.",
+    /if \(initialFile \|\| continuationTarget === "edit"\)/,
+    "Only selecting a local PDF or resuming the Workspace can mount the heavy editor.",
   );
-  assert.match(deferred, /return ready \? <EditPdfTool \/> : <ToolWorkspaceLoading \/>/);
+  assert.match(deferred, /return <EditPdfTool initialFile=\{initialFile\} \/>/);
+  assert.match(deferred, /<L2UploadStage[\s\S]*inputId="edit-pdf-upload"/);
+  assert.doesNotMatch(
+    deferred,
+    /return ready \? <EditPdfTool/,
+    "A fixed animation-frame delay is not a substitute for loading the editor on demand.",
+  );
 });
 
 
