@@ -38,6 +38,11 @@ const EVENT_NAMES = new Set<AnalyticsEventName>([
   "processing_failed",
   "processing_cancelled",
   "download_started",
+  "workspace_started",
+  "workspace_tool_switched",
+  "workspace_finish_opened",
+  "workspace_download_started",
+  "workspace_completed",
 ]);
 
 const SIZE_BUCKETS = new Set<AnalyticsSizeBucket>([
@@ -163,7 +168,9 @@ function parseEventInput(value: unknown): ParsedEvent | null {
     }
     toolSlug = record.toolSlug;
   }
-  if (eventName !== "page_view" && !toolSlug) return null;
+  // Workspace funnel events are intentionally document-free and tool-agnostic.
+  // Do not transmit document IDs, filenames, or user-selected content.
+  if (eventName !== "page_view" && !eventName.startsWith("workspace_") && !toolSlug) return null;
 
   let durationMs: number | null = null;
   if (record.durationMs !== undefined && record.durationMs !== null) {
