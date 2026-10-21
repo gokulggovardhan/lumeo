@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { L2PrivacyNote, L2UploadStage } from "@/components/pdf/workspace/ToolWorkspace";
 
 // Keep the first-visit PDF upload UI independent of the large editor,
@@ -30,8 +32,16 @@ const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
 
 export default function DeferredEditPdfTool() {
   const { continuationTarget } = useWorkspaceDocument();
+  const { availability, track } = useAnalytics();
+  const openedTrackedRef = useRef(false);
   const [initialFile, setInitialFile] = useState<File | null>(null);
   const entryRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
+    const result = track({ eventName: "tool_opened", toolSlug: "edit" });
+    if (result.accepted) openedTrackedRef.current = true;
+  }, [availability, track]);
 
   useEffect(() => {
     // Match EditPdfTool's established browser-test readiness contract.
