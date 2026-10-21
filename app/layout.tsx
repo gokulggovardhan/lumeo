@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import type { CSSProperties } from "react";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
@@ -91,6 +92,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      style={{ "--font-manrope": "system-ui" } as CSSProperties}
       className={`${fraunces.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
