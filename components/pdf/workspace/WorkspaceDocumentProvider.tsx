@@ -4,12 +4,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { WorkspaceArea, WorkspaceDocument } from "@/lib/pdf/workspace/model";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   appendWorkspaceCheckpoint,
   canRedoWorkspaceCheckpoint,
@@ -210,6 +212,34 @@ export function WorkspaceDocumentProvider({
   const [document, setDocument] =
     useState<WorkspaceDocumentRuntime | null>(null);
   const documentRef = useRef<WorkspaceDocumentRuntime | null>(null);
+  const { availability: analyticsAvailability, track: trackAnalytics } = useAnalytics();
+  // Document identity is used only in memory to deduplicate funnel transitions.
+  // It is never included in a network request or an analytics payload.
+  const funnelRef = useRef<{ documentId: string; area: WorkspaceArea } | null>(null);
+  useEffect(() => {
+    if (!document) {
+      funnelRef.current = null;
+      return;
+    }
+    if (analyticsAvailability !== "enabled") return;
+
+    const documentId = document.session.state.document.id;
+    const area = document.session.state.activeArea;
+    const previous = funnelRef.current;
+    if (!previous || previous.documentId !== documentId) {
+      trackAnalytics({ eventName: "workspace_started" });
+      if (area === "export") {
+        trackAnalytics({ eventName: "workspace_finish_opened" });
+      }
+    } else if (previous.area !== area) {
+      trackAnalytics({
+        eventName: area === "export" ? "workspace_finish_opened" : "workspace_tool_switched",
+      });
+    } else {
+      return;
+    }
+    funnelRef.current = { documentId, area };
+  }, [analyticsAvailability, document, trackAnalytics]);
   const [continuationTarget, setContinuationTarget] =
     useState<WorkspaceArea | null>(null);
   const continuationTargetRef = useRef<WorkspaceArea | null>(null);

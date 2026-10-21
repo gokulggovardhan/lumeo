@@ -317,3 +317,33 @@ historical date selector. The live cards, ten-minute buckets, location
 reconciliation, recent hits, and `Last updated` timestamp come from one
 database snapshot time. Selected-range analytics use inclusive Asia/Kolkata
 calendar-day boundaries and retain zero-traffic days in the daily trend.
+
+
+## Step 10 — Private Workspace funnel analytics
+
+The existing first-party provider now accepts five **document-free** funnel
+events: `workspace_started`, `workspace_tool_switched`,
+`workspace_finish_opened`, `workspace_download_started`, and
+`workspace_completed`. The provider records a start once per local document
+and a change only when the active Workspace area actually changes; repeated
+React rendering does not count as another switch. A completed workflow means
+that the browser initiated and prepared a PDF download successfully, **not**
+that the user opened or saved the file after it left Lumeo.
+
+The event payload contains only the approved event name and a normalized public
+page route. **No** local document/session ID, filename, PDF bytes, extracted
+text, page count, metadata, user-entered value, or exact file size is sent.
+Local document identity is consulted in memory only to avoid duplicate events.
+The same first-party `/api/analytics` endpoint, strict payload allowlist,
+origin check, rate limits, server-only ingestion secret, schema-v2 identity
+policy, and real-audience/synthetic traffic classification are reused. No
+second analytics provider, client storage queue, or third-party service exists.
+Collection remains disabled when the public setting is off or Do Not Track is
+enabled. PDF upload, editing, export, and download never depend on analytics.
+
+Database migration:
+`supabase/migrations/20261021183000_workspace_funnel_analytics.sql`.
+It extends the existing protected writer vocabulary without replacing data
+tables or loosening RLS. Admin tools can query authorized events through the
+existing verified analytics readers; a dedicated funnel dashboard is not added
+by this step.

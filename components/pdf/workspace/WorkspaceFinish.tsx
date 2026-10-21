@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { AuraButton, AuraInput, AuraStatus } from "@/components/ui/Aura";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import {
@@ -34,6 +35,7 @@ function changeSummaries(
 
 export function WorkspaceFinish() {
   const router = useRouter();
+  const { track: trackAnalytics } = useAnalytics();
   const {
     document,
     fileForCurrentRevision,
@@ -119,12 +121,14 @@ export function WorkspaceFinish() {
       link.href = url;
       link.download = safeName;
       window.document.body.appendChild(link);
+      trackAnalytics({ eventName: "workspace_download_started" });
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
 
       replaceSession(completeWorkspaceExport(exporting));
       setDownloaded(true);
+      trackAnalytics({ eventName: "workspace_completed" });
     } catch {
       try {
         replaceSession(failWorkspaceExport(exporting));
