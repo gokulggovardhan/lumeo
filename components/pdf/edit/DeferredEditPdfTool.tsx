@@ -1,9 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
+import { L2PrivacyNote, L2UploadStage } from "@/components/pdf/workspace/ToolWorkspace";
 
-
+// Keep the first-visit PDF upload UI independent of the large editor,
+// OCR, shaping and native PDF rewrite modules. None of those modules is
+// needed until a PDF has been selected (or a Workspace continuation exists).
 function ToolWorkspaceLoading() {
   return (
     <section
@@ -25,21 +29,37 @@ const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
 });
 
 export default function DeferredEditPdfTool() {
-  const [ready, setReady] = useState(false);
+  const { continuationTarget } = useWorkspaceDocument();
+  const [initialFile, setInitialFile] = useState<File | null>(null);
+  const entryRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        setReady(true);
-      });
-    });
-
-    return () => {
-      window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    };
+    // Match EditPdfTool's established browser-test readiness contract.
+    entryRef.current?.setAttribute("data-edit-client-ready", "true");
   }, []);
 
-  return ready ? <EditPdfTool /> : <ToolWorkspaceLoading />;
+  // A continuation must bypass the fresh-upload gate and be consumed by
+  // EditPdfTool exactly as before. The File lives only in browser memory.
+  if (initialFile || continuationTarget === "edit") {
+    return <EditPdfTool initialFile={initialFile} />;
+  }
+
+  return (
+    <section ref={entryRef} className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+      <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
+        <L2UploadStage
+          inputId="edit-pdf-upload"
+          accept="application/pdf,.pdf"
+          acceptedNote="PDF only · One file"
+          multiple={false}
+          buttonLabel="Select PDF"
+          onFilesSelected={(files) => {
+            const file = files.item(0);
+            if (file) setInitialFile(file);
+          }}
+        />
+      </div>
+      <L2PrivacyNote />
+    </section>
+  );
 }
