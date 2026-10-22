@@ -8,8 +8,7 @@ import { captureClientError } from "@/lib/errors/client";
 export default function PdfToolError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     void captureClientError({
-      message: error.message,
-      stack: error.stack ?? null,
+      message: "PDF tool render failure",
       component: "PdfToolError",
       source: "error_boundary",
       severity: "high",
