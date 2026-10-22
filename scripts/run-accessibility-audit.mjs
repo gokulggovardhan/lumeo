@@ -121,7 +121,7 @@ async function auditDesktopChromium() {
   const page = await context.newPage();
 
   try {
-    for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit"]) {
+    for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit", "/phase11-missing-route-accessibility-check"]) {
       await gotoAndAudit(page, route, `desktop Chromium ${route}`);
     }
   } finally {
@@ -138,7 +138,7 @@ async function auditMobileWebKit() {
   const page = await context.newPage();
 
   try {
-    for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit"]) {
+    for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit", "/phase11-missing-route-accessibility-check"]) {
       await gotoAndAudit(page, route, `mobile WebKit ${route}`);
     }
 
