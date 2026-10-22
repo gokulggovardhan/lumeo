@@ -381,6 +381,9 @@ test("production connected Workspace preserves a real Pages change through Edit 
   await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
     timeout: 90_000,
   });
+  const identity = page.locator("[data-workspace-document-identity]");
+  const initialRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
+  expect(Number.isSafeInteger(initialRevision)).toBe(true);
 
   await page.getByRole("button", { name: "Rotate right" }).first().click();
   await expect(page.locator("[data-workspace-operation-count]")).toHaveAttribute(
@@ -393,7 +396,8 @@ test("production connected Workspace preserves a real Pages change through Edit 
     timeout: 90_000,
   });
 
-  const identity = page.locator("[data-workspace-document-identity]");
+  await expect.poll(async () => Number(await identity.getAttribute("data-workspace-revision-number")))
+    .toBeGreaterThan(initialRevision);
   const savedRevision = await identity.getAttribute("data-workspace-revision-number");
   const savedFileName = await identity.locator("[data-workspace-document-filename]").getAttribute("title");
   expect(savedRevision).toBeTruthy();
