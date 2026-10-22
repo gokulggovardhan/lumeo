@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
+
+const subscribeToHydration = () => () => {};
 
 export function MaintenanceModeSubmitButton({
   wasEnabled,
@@ -10,11 +12,9 @@ export function MaintenanceModeSubmitButton({
 }) {
   const { pending } = useFormStatus();
   const [confirming, setConfirming] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  // A safety-critical maintenance action must not submit before its
-  // confirmation handler is hydrated (especially after Server Action refresh).
-  useEffect(() => setHydrated(true), []);
+  // A safety-critical action is disabled during SSR and until hydration
+  // so an early click cannot bypass the client-side confirmation dialog.
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
 
   function willEnable(form: HTMLFormElement | null) {
     const toggle = form?.elements.namedItem("value");
