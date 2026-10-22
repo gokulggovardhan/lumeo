@@ -13,6 +13,7 @@ on:
       - "scripts/check-route-js-budget.mjs"
       - "tests/route-js-budget-contract.test.ts"
       - ".github/workflows/route-js-budget.yml"
+      - ".github/workflows/workspace-production-certification.yml"
       - "package.json"
       - "package-lock.json"
   push:
@@ -26,6 +27,7 @@ on:
       - "worker/**"
       - "scripts/check-route-js-budget.mjs"
       - ".github/workflows/route-js-budget.yml"
+      - ".github/workflows/workspace-production-certification.yml"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:

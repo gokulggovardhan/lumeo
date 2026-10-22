@@ -381,6 +381,9 @@ test("production connected Workspace preserves a real Pages change through Edit 
   await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
     timeout: 90_000,
   });
+  const identity = page.locator("[data-workspace-document-identity]");
+  const initialRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
+  expect(Number.isSafeInteger(initialRevision)).toBe(true);
 
   await page.getByRole("button", { name: "Rotate right" }).first().click();
   await expect(page.locator("[data-workspace-operation-count]")).toHaveAttribute(
@@ -393,11 +396,39 @@ test("production connected Workspace preserves a real Pages change through Edit 
     timeout: 90_000,
   });
 
-  await clickPersistentWorkspaceNav(page, "Edit");
-  await expect(page).toHaveURL(/\/pdf\/edit$/);
-  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
-    timeout: 30_000,
-  });
+  await expect.poll(async () => Number(await identity.getAttribute("data-workspace-revision-number")))
+    .toBeGreaterThan(initialRevision);
+  const savedRevision = await identity.getAttribute("data-workspace-revision-number");
+  const savedFileName = await identity.locator("[data-workspace-document-filename]").getAttribute("title");
+  expect(savedRevision).toBeTruthy();
+  expect(savedFileName).toBeTruthy();
+
+  for (let visit = 0; visit < 2; visit += 1) {
+    await clickPersistentWorkspaceNav(page, "Edit");
+    await expect(page).toHaveURL(/\/pdf\/edit$/);
+    // Mounting the deferred entry alone does not prove the one-shot handoff
+    // survived consumption. Require the initialized editor and decoded PDF.
+    await expect(page.locator('[data-workspace-projection-compatible="true"]')).toBeVisible({
+      timeout: 90_000,
+    });
+    const preview = page.getByRole("img", { name: "Page 1 preview", exact: true });
+    await expect(preview).toBeVisible({ timeout: 90_000 });
+    await expect.poll(() => preview.evaluate((img: HTMLImageElement) =>
+      img.complete && img.naturalWidth > 0,
+    )).toBe(true);
+    await expect(page.getByRole("button", { name: "Select PDF", exact: true })).toHaveCount(0);
+    await expect(identity).toHaveAttribute("data-workspace-revision-number", savedRevision!);
+    await expect(identity.locator("[data-workspace-document-filename]")).toHaveAttribute("title", savedFileName!);
+    await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
+
+    if (visit === 0) {
+      await clickPersistentWorkspaceNav(page, "Pages");
+      await expect(page).toHaveURL(/\/pdf\/organize$/);
+      await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
+        timeout: 90_000,
+      });
+    }
+  }
 
   await clickPersistentWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);

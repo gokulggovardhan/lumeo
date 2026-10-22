@@ -13,6 +13,7 @@ on:
       - "scripts/run-mobile-lighthouse.mjs"
       - ".lighthouserc.cjs"
       - ".github/workflows/mobile-lighthouse.yml"
+      - ".github/workflows/workspace-production-certification.yml"
       - "tests/mobile-lighthouse-contract.test.ts"
       - "package.json"
       - "package-lock.json"
@@ -28,6 +29,7 @@ on:
       - "scripts/run-mobile-lighthouse.mjs"
       - ".lighthouserc.cjs"
       - ".github/workflows/mobile-lighthouse.yml"
+      - ".github/workflows/workspace-production-certification.yml"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:

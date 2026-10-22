@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/cloudflare-production-audit.yml"
+      - ".github/workflows/workspace-production-certification.yml"
       - "next.config.ts"
       - "app/layout.tsx"
       - "app/robots.ts"
@@ -17,6 +18,11 @@ on:
       - "worker/**"
       - "e2e/cloudflare-production.spec.ts"
       - "playwright.cloudflare-production.config.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/workspace-production-certification.yml"
   workflow_dispatch:
   schedule:
     - cron: "15 1 * * *"
