@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
-import { TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
+import { EDITABLE_TWO_PAGE_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 
 test.beforeAll(async () => {
   await writeFixtures();
@@ -52,6 +52,21 @@ async function openConnectedWorkspace(page: Page) {
   await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
   await expect(page.locator("[data-workspace-mobile-nav]")).toBeVisible();
+  await expectConnectedEditor(page);
+}
+
+async function expectConnectedEditor(page: Page) {
+  await expect(
+    page.locator('[data-workspace-projection-compatible="true"]'),
+  ).toBeVisible({ timeout: 90_000 });
+  // A route change and persistent navigation alone do not prove the editor
+  // survived consuming the one-shot handoff. Wait for its real PDF preview.
+  const preview = page.getByRole("img", { name: "Page 1 preview", exact: true });
+  await expect(preview).toBeVisible({ timeout: 90_000 });
+  await expect.poll(() => preview.evaluate((img: HTMLImageElement) =>
+    img.complete && img.naturalWidth > 0,
+  )).toBe(true);
+  await expect(page.getByRole("button", { name: "Select PDF", exact: true })).toHaveCount(0);
 }
 
 async function expectMobileNavFits(page: Page, width: number, height: number) {
@@ -93,6 +108,31 @@ async function nativeBeforeUnloadIsBlocked(page: Page): Promise<boolean> {
     return event.defaultPrevented;
   });
 }
+
+test("desktop Workspace opens an editable document directly and can repeat the handoff", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/pdf", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles(EDITABLE_TWO_PAGE_PDF);
+  await expect(page.getByRole("heading", { name: "Choose your next step.", exact: true })).toBeVisible();
+
+  for (let visit = 0; visit < 2; visit += 1) {
+    await page.getByRole("button", { name: /^Edit/ }).click();
+    await expect(page).toHaveURL(/\/pdf\/edit$/);
+    await expectConnectedEditor(page);
+    await expect(page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]').first()).toBeVisible({ timeout: 90_000 });
+    const identity = page.locator("[data-workspace-document-identity]");
+    await expect(identity.locator("[data-workspace-document-filename]")).toHaveAttribute("title", "editable-two-page.pdf");
+    await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
+    await expect(identity).toHaveAttribute("data-workspace-revision-number", "0");
+    await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(false);
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/pdf$/);
+    await expect(page.getByRole("heading", { name: "Choose your next step.", exact: true })).toBeVisible();
+  }
+});
 
 test("upload once can switch tools immediately and Finish exports the latest materialized revision", async ({
   page,
@@ -157,9 +197,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   // Switching tools does not require Save/Download/Continue first.
   await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
-  await expect(
-    page.locator('[data-workspace-projection-compatible="true"]'),
-  ).toBeVisible({ timeout: 90_000 });
+  await expectConnectedEditor(page);
+  await expect(identity).toHaveAttribute("data-workspace-revision-number", String(initialRevision));
 
   await clickWorkspaceNav(page, "Pages");
   await expect(page).toHaveURL(/\/pdf\/organize$/);
@@ -183,6 +222,25 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   // The identity must follow the newly materialized revision in-place.
   await expect.poll(async () => Number(await identity.getAttribute("data-workspace-revision-number"))).toBeGreaterThan(initialRevision);
   const savedRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
+  const savedFileName = await identity.locator("[data-workspace-document-filename]").getAttribute("title");
+  expect(savedFileName).toBeTruthy();
+
+  // Every route mount gets a fresh one-shot handoff. Repeatedly enter Edit
+  // after a real page operation and verify it retains the latest revision.
+  for (let visit = 0; visit < 2; visit += 1) {
+    await clickWorkspaceNav(page, "Edit");
+    await expect(page).toHaveURL(/\/pdf\/edit$/);
+    await expectConnectedEditor(page);
+    await expect(identity).toHaveAttribute("data-workspace-revision-number", String(savedRevision));
+    await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
+    await expect(identity.locator("[data-workspace-document-filename]")).toHaveAttribute("title", savedFileName!);
+
+    await clickWorkspaceNav(page, "Pages");
+    await expect(page).toHaveURL(/\/pdf\/organize$/);
+    await expect(page.locator("[data-workspace-lifecycle]")).toHaveAttribute(
+      "data-workspace-lifecycle", "ready", { timeout: 90_000 },
+    );
+  }
 
   // Do not click a Continue-with-this-PDF action. The successful result is
   // auto-materialized, so persistent Workspace navigation must use it.

@@ -45,7 +45,6 @@ import { OcrWordOverlay } from "@/components/pdf/edit/OcrWordOverlay";
 import { NativeTextFormatPanel, type NativeTextStyleDraft } from "@/components/pdf/edit/NativeTextFormatPanel";
 import { NativeTextMixedFormatPanel } from "@/components/pdf/edit/NativeTextMixedFormatPanel";
 import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
-import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
   createShapeElement,
@@ -631,14 +630,13 @@ function RedoIcon() {
   );
 }
 
-export default function EditPdfTool() {
-  const { availability, track } = useAnalytics();
+export default function EditPdfTool({ initialFile = null }: { initialFile?: File | null }) {
+  const { track } = useAnalytics();
   const {
     continuationTarget,
     takeContinuation,
     reportDocumentHealth,
   } = useWorkspaceDocument();
-  const openedTrackedRef = useRef(false);
   const workspaceSourceSequenceRef = useRef(1);
 
   // Phase 9.2: split from a single `pdf` state so its `.bytes` can be a pure
@@ -2458,12 +2456,6 @@ export default function EditPdfTool() {
   }, [disposeLocalCustomFontFaces]);
 
   useEffect(() => {
-    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
-    const result = track({ eventName: "tool_opened", toolSlug: "edit" });
-    if (result.accepted) openedTrackedRef.current = true;
-  }, [availability, track]);
-
-  useEffect(() => {
     return () => {
       exportRequestRevisionRef.current += 1;
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
@@ -3479,6 +3471,15 @@ export default function EditPdfTool() {
     resetHistory,
     resetLocalCustomFonts,
   ]);
+
+  // A PDF chosen in the lightweight entry is consumed exactly once after
+  // the full editor module has loaded. The file never leaves this browser.
+  const initialFileConsumedRef = useRef<File | null>(null);
+  useEffect(() => {
+    if (!initialFile || initialFileConsumedRef.current === initialFile) return;
+    initialFileConsumedRef.current = initialFile;
+    void addFile([initialFile]);
+  }, [addFile, initialFile]);
 
   useEffect(() => {
     if (pdfMeta || continuationTarget !== "edit") return;
