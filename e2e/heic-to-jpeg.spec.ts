@@ -200,21 +200,23 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
   const outputSizes: number[] = [];
 
   for (const quality of qualities) {
-    await page.goto("/heic-to-jpeg");
-    await page.locator('input[type="file"]').setInputFiles(fixture!);
-    await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
-    await page.getByLabel("Quality").selectOption(quality);
-    await page.getByRole("button", { name: "Convert to JPEG" }).click();
+    const qualityPage = await qualityPage.context().newPage();
+    try {
+    await qualityPage.goto("/heic-to-jpeg");
+    await qualityPage.locator('input[type="file"]').setInputFiles(fixture!);
+    await expect(qualityPage.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+    await qualityPage.getByLabel("Quality").selectOption(quality);
+    await qualityPage.getByRole("button", { name: "Convert to JPEG" }).click();
 
     const startedAt = Date.now();
-    const asset = page.locator("[data-photo-asset]").first();
+    const asset = qualityPage.locator("[data-photo-asset]").first();
     await expect(asset).toHaveAttribute("data-primary-dimensions", "6048x8064", { timeout: 120_000 });
     await expect(asset).toHaveAttribute("data-decoded-dimensions", "6048x8064");
     await expect(asset).toHaveAttribute("data-output-dimensions", "6048x8064");
-    await expect(page.getByText("6048 × 8064 source → 6048 × 8064 JPEG", { exact: false })).toBeVisible();
+    await expect(qualityPage.getByText("6048 × 8064 source → 6048 × 8064 JPEG", { exact: false })).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download JPEG", exact: true }).first().click();
+    await qualityPage.getByRole("button", { name: "Download JPEG", exact: true }).first().click();
     const download = await downloadPromise;
     const path = await download.path();
     expect(path).not.toBeNull();
@@ -223,8 +225,10 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
     expect(jpegDimensions(bytes)).toEqual({ width: 6048, height: 8064 });
     outputSizes.push(bytes.length);
     console.info(`[heic-resolution] ${testInfo.project.name} q${quality}: primary=6048x8064 decoded=6048x8064 jpeg=6048x8064 bytes=${bytes.length} elapsedMs=${Date.now() - startedAt}`);
+    } finally {
+      await qualityPage.close();
+    }
   }
-
   if (testInfo.project.name === "chromium") {
     expect(outputSizes).toHaveLength(3);
     expect(outputSizes[0]).toBeLessThan(outputSizes[2]);
