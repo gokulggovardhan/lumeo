@@ -230,11 +230,24 @@ export default function WordToPdfTool() {
       if (currentSession !== sessionRef.current) return;
 
       const normalized = normalizeConversionError(prepareError);
-      if (normalized.code === "cancelled" || controller.signal.aborted) {
+      if (controller.signal.aborted) {
         setPhase(null);
         setStage("cancelled");
         setStatusLabel("Preparation cancelled");
         setError(null);
+        return;
+      }
+
+      // The Office worker may itself reject with AbortError although the user
+      // never cancelled. Do not misreport that as a deliberate cancellation:
+      // retain the file and provide the existing real engine-retry action.
+      if (normalized.code === "cancelled") {
+        setPhase(null);
+        setStage("recoverable-error");
+        setStatusLabel("Engine needs attention");
+        setError(conversionUserError("runtime-load-failed", {
+          message: "The local Office engine stopped unexpectedly. Retry the engine to continue.",
+        }));
         return;
       }
 
