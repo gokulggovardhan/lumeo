@@ -244,3 +244,12 @@ jobs:
           done
 
           echo "Lumeo production health verification passed."
+
+      - name: Preserve production freshness evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-freshness-evidence
+          path: test-results/production-freshness.json
+          if-no-files-found: error
+          retention-days: 90

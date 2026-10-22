@@ -204,7 +204,7 @@ jobs:
           node scripts/verify-error-ingest-rate-limit.mjs
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Run public discovery hierarchy regression
         run: npx playwright test e2e/pdf-tools-discovery.spec.ts --project=chromium
@@ -215,8 +215,23 @@ jobs:
       - name: Run PDF Workspace mobile navigation regression
         run: npx playwright test e2e/workspace-mobile.spec.ts --project=chromium
 
-      - name: Run Phase 11 recovery on Chromium and WebKit
-        run: npx playwright test e2e/phase11-recovery.spec.ts --project=chromium --project=webkit
+      - name: Run Phase 11 recovery on Chromium, WebKit and Firefox
+        env:
+          LUMEO_RECOVERY_FIXTURES: "1"
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/phase11-recovery.json
+        run: |
+          node scripts/phase11-test-fixtures.mjs
+          trap 'node scripts/phase11-test-fixtures.mjs clean' EXIT
+          npx playwright test e2e/phase11-recovery.spec.ts --project=chromium --project=webkit --project=firefox --reporter=list,json
+
+      - name: Preserve Phase 11 recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase11-recovery-evidence
+          path: test-results
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin

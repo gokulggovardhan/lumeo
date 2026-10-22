@@ -79,3 +79,8 @@ playwright-report/
 
 # Generated from pinned Tesseract.js + English model packages before app builds.
 /public/ocr/
+
+# Ephemeral Phase 11 controlled-failure routes (created only by the test runner)
+/app/phase11-recovery-fixture/
+/app/pdf/phase11-recovery-fixture/
+/app/admin/(protected)/phase11-recovery-fixture/

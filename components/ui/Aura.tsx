@@ -1016,7 +1016,7 @@ export function L2PublicEmptyState({ title, message, action }: { title: string; 
 
 export function L2PublicErrorState({ title, message, actions }: { title: string; message: string; actions?: ReactNode }) {
   return (
-    <section className="l2-public-error-state aura-luminous-card mx-auto max-w-xl rounded-[var(--radius-2xl)] p-6 text-center">
+    <section role="alert" aria-label={title} className="l2-public-error-state aura-luminous-card mx-auto max-w-xl rounded-[var(--radius-2xl)] p-6 text-center">
       <AuraStatus tone="warning" label="Needs a refresh" />
       <h1 className="mt-4 font-serif font-semibold text-3xl tracking-[-0.03em] text-[var(--text-primary)]">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{message}</p>

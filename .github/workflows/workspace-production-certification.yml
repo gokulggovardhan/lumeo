@@ -165,11 +165,21 @@ jobs:
       - name: Install Chromium, WebKit and Firefox
         run: npx playwright install --with-deps chromium webkit firefox
 
+      - name: Verify Phase 11 production freshness and recovery
+        run: |
+          npm run verify:production-freshness
+          npx playwright test --config=playwright.phase11-production.config.ts
+
       - name: Run live production conversion certification
         run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
 
-      - name: Upload production traces on failure
-        if: failure()
+      - name: Recheck revision after live certification
+        env:
+          LUMEO_FRESHNESS_REPORT: test-results/production-freshness-after.json
+        run: npm run verify:production-freshness
+
+      - name: Upload production certification evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: workspace-production-certification-report
@@ -177,4 +187,4 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 90
