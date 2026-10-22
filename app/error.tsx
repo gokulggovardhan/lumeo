@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { captureClientError } from "@/lib/errors/client";
 
 export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Never transmit document contents or raw error messages from a private PDF session.
-    // Existing app-level ErrorMonitor handles privacy-safe reporting separately.
+    // Report only a fixed category, never raw exception text, stack or PDF content.
+    void captureClientError({ message: "Public route render failure", source: "error_boundary", component: "RootErrorBoundary", severity: "high" });
     if (process.env.NODE_ENV === "development") console.error("Lumeo route error", error);
   }, [error]);
 
