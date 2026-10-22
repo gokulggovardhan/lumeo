@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { captureClientError } from "@/lib/errors/client";
 
 export default function AdminError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
+    void captureClientError({ message: "Admin route render failure", source: "error_boundary", component: "AdminErrorBoundary", severity: "high" });
     if (process.env.NODE_ENV === "development") console.error("Admin route error", error);
   }, [error]);
 
