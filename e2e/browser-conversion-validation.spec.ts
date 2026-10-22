@@ -785,6 +785,16 @@ test.describe("browser conversion validation lab", () => {
     });
 
     const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+    const retryEngine = page.getByRole("button", { name: "Retry engine" });
+    // A cold Office runtime may abort its first startup independently of the
+    // user. Exercise the real recovery affordance and still require the actual
+    // conversion plus a valid downloaded PDF, never a mocked success.
+    await expect.poll(async () => {
+      if (await convertButton.isEnabled().catch(() => false)) return "ready";
+      if (await retryEngine.isVisible().catch(() => false)) return "retry";
+      return "preparing";
+    }, { timeout: 200_000 }).not.toBe("preparing");
+    if (await retryEngine.isVisible()) await retryEngine.click();
     await expect(convertButton).toBeEnabled({ timeout: 180_000 });
     await convertButton.click();
     await expect(page.getByText("PDF ready")).toBeVisible({
