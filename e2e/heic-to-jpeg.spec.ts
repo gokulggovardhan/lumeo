@@ -200,7 +200,7 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
   const outputSizes: number[] = [];
 
   for (const quality of qualities) {
-    const qualityPage = await qualityPage.context().newPage();
+    const qualityPage = await page.context().newPage();
     try {
     await qualityPage.goto("/heic-to-jpeg");
     await qualityPage.locator('input[type="file"]').setInputFiles(fixture!);
