@@ -233,6 +233,11 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Clear generated types for removed recovery fixtures
+        run: |
+          node scripts/phase11-test-fixtures.mjs clean
+          rm -rf .next
+
       - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin
 
