@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
+
+const subscribeToHydration = () => () => {};
 
 export function MaintenanceModeSubmitButton({
   wasEnabled,
@@ -10,6 +12,9 @@ export function MaintenanceModeSubmitButton({
 }) {
   const { pending } = useFormStatus();
   const [confirming, setConfirming] = useState(false);
+  // A safety-critical action is disabled during SSR and until hydration
+  // so an early click cannot bypass the client-side confirmation dialog.
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
 
   function willEnable(form: HTMLFormElement | null) {
     const toggle = form?.elements.namedItem("value");
@@ -52,7 +57,7 @@ export function MaintenanceModeSubmitButton({
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || !hydrated}
             onClick={(event) => {
               if (!willEnable(event.currentTarget.form)) {
                 event.preventDefault();
@@ -65,7 +70,7 @@ export function MaintenanceModeSubmitButton({
           </button>
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || !hydrated}
             onClick={() => setConfirming(false)}
             className="min-h-11 rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-4 py-2 text-sm font-bold text-[var(--lumeo-paper-100)] transition hover:border-[var(--border-premium)] disabled:opacity-45"
           >
@@ -80,8 +85,9 @@ export function MaintenanceModeSubmitButton({
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || !hydrated}
       onClick={submitOrConfirm}
+      data-client-ready={hydrated ? "true" : "false"}
       className="min-h-11 rounded-[var(--radius-md)] border border-[rgba(var(--lumeo-seal-rgb),0.6)] bg-[var(--lumeo-seal-600)] px-4 py-2 text-sm font-bold text-[var(--lumeo-paper-50)] shadow-[var(--shadow-success)] transition duration-200 hover:bg-[var(--lumeo-seal-500)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-45"
     >
       {pending ? "Saving..." : "Save changes"}
