@@ -17,13 +17,14 @@ export default function PdfToolError({ error, reset }: { error: Error & { digest
   }, [error]);
 
   return (
-    <main className="min-h-dvh bg-[var(--surface-canvas)] px-5 py-12 text-[var(--text-primary)] sm:px-8">
+    <main id="main-content" className="min-h-dvh bg-[var(--surface-canvas)] px-5 py-12 text-[var(--text-primary)] sm:px-8">
       <L2PublicErrorState
         title="This tool hit a snag."
-        message="Something interrupted processing. Your files never left your device — you can retry or return home."
+        message="Something interrupted processing. Processing was interrupted. Try again before navigating away; unsaved document changes may be lost."
         actions={(
           <>
             <AuraButton type="button" onClick={reset}>Try again</AuraButton>
+            <Link href="/pdf" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">PDF Workspace</Link>
             <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] transition hover:bg-[rgba(var(--paper-rgb),0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
               Back home
             </Link>
