@@ -6,6 +6,8 @@ test.describe("Phase 11 — missing-route recovery", () => {
     expect(response?.status()).toBe(404);
     await expect(page.getByRole("heading", { name: "This page is not here." })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Page recovery" })).toBeVisible();
+    await expect(page.getByText("Your PDF files have not been uploaded by this page.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Browse PDF Tools" })).toHaveAttribute("href", "/pdf-tools");
     const workspace = page.getByRole("link", { name: "Open PDF Workspace" });
     await expect(workspace).toHaveAttribute("href", "/pdf");
     await page.keyboard.press("Tab");
@@ -21,6 +23,7 @@ test.describe("Phase 11 — missing-route recovery", () => {
     await expect(page.getByRole("heading", { name: "This page is not here." })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow).toBe(false);
-    await expect(page.getByRole("link", { name: "Go home" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go home" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("navigation", { name: "Page recovery" })).toBeVisible();
   });
 });
