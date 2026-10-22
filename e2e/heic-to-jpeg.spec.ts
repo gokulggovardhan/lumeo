@@ -215,7 +215,7 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
     await expect(asset).toHaveAttribute("data-output-dimensions", "6048x8064");
     await expect(qualityPage.getByText("6048 × 8064 source → 6048 × 8064 JPEG", { exact: false })).toBeVisible();
 
-    const downloadPromise = page.waitForEvent("download");
+    const downloadPromise = qualityPage.waitForEvent("download");
     await qualityPage.getByRole("button", { name: "Download JPEG", exact: true }).first().click();
     const download = await downloadPromise;
     const path = await download.path();
