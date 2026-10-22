@@ -209,9 +209,11 @@ test("Edit PDF heavy client graph starts only after the first paint boundary", (
   assert.match(deferred, /ssr:\s*false/);
   assert.match(
     deferred,
-    /if \(initialFile \|\| continuationTarget === "edit"\)/,
-    "Only selecting a local PDF or resuming the Workspace can mount the heavy editor.",
+    /if \(initialFile \|\| editorRequested\)/,
+    "Selecting a local PDF or a retained Workspace handoff can mount the heavy editor.",
   );
+  assert.match(deferred, /useState\(continuationTarget === "edit"\)/);
+  assert.match(deferred, /if \(continuationTarget === "edit" && !editorRequested\) \{\s*setEditorRequested\(true\)/);
   assert.match(deferred, /return <EditPdfTool initialFile=\{initialFile\} \/>/);
   assert.match(deferred, /<L2UploadStage[\s\S]*inputId="edit-pdf-upload"/);
   assert.doesNotMatch(

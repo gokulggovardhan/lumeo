@@ -11,7 +11,14 @@ test("Edit PDF first visit renders an actual file chooser without importing the 
   assert.match(entry, /const file = files\.item\(0\)/);
   assert.match(entry, /if \(file\) setInitialFile\(file\)/);
   assert.match(entry, /ssr: false/);
-  assert.match(entry, /if \(initialFile \|\| continuationTarget === "edit"\)/);
+  assert.match(entry, /if \(initialFile \|\| editorRequested\)/);
+});
+
+test("consuming a Workspace continuation cannot close the deferred editor", () => {
+  assert.match(entry, /useState\(continuationTarget === "edit"\)/);
+  assert.match(entry, /if \(continuationTarget === "edit" && !editorRequested\) \{\s*setEditorRequested\(true\)/);
+  assert.doesNotMatch(entry, /setEditorRequested\(false\)/);
+  assert.doesNotMatch(entry, /if \(initialFile \|\| continuationTarget === "edit"\)/);
 });
 
 test("Selected PDF is handed to the existing editor once in browser memory", () => {

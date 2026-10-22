@@ -35,6 +35,7 @@ export default function DeferredEditPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
   const [initialFile, setInitialFile] = useState<File | null>(null);
+  const [editorRequested, setEditorRequested] = useState(continuationTarget === "edit");
   const entryRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -48,9 +49,16 @@ export default function DeferredEditPdfTool() {
     entryRef.current?.setAttribute("data-edit-client-ready", "true");
   }, []);
 
-  // A continuation must bypass the fresh-upload gate and be consumed by
-  // EditPdfTool exactly as before. The File lives only in browser memory.
-  if (initialFile || continuationTarget === "edit") {
+  // takeContinuation clears the provider's one-shot target before the PDF
+  // finishes opening. Retain the request for this entry's lifetime so that
+  // consuming it cannot unmount the editor and discard its in-flight load.
+  // Adjust during render so this also handles a handoff arriving after mount,
+  // before the child can consume it. Route unmount resets this local state.
+  if (continuationTarget === "edit" && !editorRequested) {
+    setEditorRequested(true);
+  }
+
+  if (initialFile || editorRequested) {
     return <EditPdfTool initialFile={initialFile} />;
   }
 
