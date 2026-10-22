@@ -215,6 +215,9 @@ jobs:
       - name: Run PDF Workspace mobile navigation regression
         run: npx playwright test e2e/workspace-mobile.spec.ts --project=chromium
 
+      - name: Run Phase 11 recovery on Chromium and WebKit
+        run: npx playwright test e2e/phase11-recovery.spec.ts --project=chromium --project=webkit
+
       - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin
 
