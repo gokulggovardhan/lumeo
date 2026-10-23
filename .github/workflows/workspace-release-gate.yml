@@ -119,14 +119,16 @@ jobs:
           import re
           config = Path("supabase/config.toml")
           contents = config.read_text()
-          match = re.search(r"(?ms)^\[inbucket\]\s*\n(.*?)(?=^\[|\Z)", contents)
-          if not match:
-              raise SystemExit("Missing Supabase inbucket configuration")
-          section = match.group(0)
-          updated, count = re.subn(r"(?m)^enabled\s*=\s*true\s*$", "enabled = false", section, count=1)
-          if count != 1:
-              raise SystemExit("Expected enabled Inbucket service in isolated test config")
-          config.write_text(contents[:match.start()] + updated + contents[match.end():])
+          match = re.search(r"(?ms)^\[inbucket\][^\n]*\n.*?(?=^\[|\Z)", contents)
+          if match:
+              section = match.group(0)
+              updated, count = re.subn(r"(?m)^enabled\s*=\s*(?:true|false)\s*$", "enabled = false", section, count=1)
+              if not count:
+                  updated = section.rstrip() + "\n" + "enabled = false\n"
+              contents = contents[:match.start()] + updated + contents[match.end():]
+          else:
+              contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
+          config.write_text(contents)
           PY
           npx supabase start
 
@@ -290,14 +292,16 @@ jobs:
           import re
           config = Path("supabase/config.toml")
           contents = config.read_text()
-          match = re.search(r"(?ms)^\[inbucket\]\s*\n(.*?)(?=^\[|\Z)", contents)
-          if not match:
-              raise SystemExit("Missing Supabase inbucket configuration")
-          section = match.group(0)
-          updated, count = re.subn(r"(?m)^enabled\s*=\s*true\s*$", "enabled = false", section, count=1)
-          if count != 1:
-              raise SystemExit("Expected enabled Inbucket service in isolated test config")
-          config.write_text(contents[:match.start()] + updated + contents[match.end():])
+          match = re.search(r"(?ms)^\[inbucket\][^\n]*\n.*?(?=^\[|\Z)", contents)
+          if match:
+              section = match.group(0)
+              updated, count = re.subn(r"(?m)^enabled\s*=\s*(?:true|false)\s*$", "enabled = false", section, count=1)
+              if not count:
+                  updated = section.rstrip() + "\n" + "enabled = false\n"
+              contents = contents[:match.start()] + updated + contents[match.end():]
+          else:
+              contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
+          config.write_text(contents)
           PY
           npx supabase start
 
