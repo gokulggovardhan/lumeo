@@ -75,7 +75,7 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   page.on("request", (request) => { if (request.method() === "POST") uploads.push(request.url()); });
   await page.locator('input[type="file"]').setInputFiles([
     { name: "CURRENT.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
-    { name: "CURRENT.MOV", mimeType: "video/quicktime", buffer: Buffer.from("synthetic companion") },
+    // Add the Live Photo companion separately: WebKit may discard the entire\n    // mixed file-input selection when a video is supplied alongside images.\n    // The picker should receive image files only; companion handling is tested\n    // through the drag-and-drop import path.\n
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
   ]);
   await expect(page.getByRole("heading", { name: "2 photos detected" })).toBeVisible();
