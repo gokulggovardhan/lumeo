@@ -112,6 +112,22 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
+          # Inbucket is not needed for catalog tests. Its default host port
+          # can collide with other services on shared GitHub runners.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path("supabase/config.toml")
+          contents = config.read_text()
+          match = re.search(r"(?ms)^\[inbucket\]\s*\n(.*?)(?=^\[|\Z)", contents)
+          if not match:
+              raise SystemExit("Missing Supabase inbucket configuration")
+          section = match.group(0)
+          updated, count = re.subn(r"(?m)^enabled\s*=\s*true\s*$", "enabled = false", section, count=1)
+          if count != 1:
+              raise SystemExit("Expected enabled Inbucket service in isolated test config")
+          config.write_text(contents[:match.start()] + updated + contents[match.end():])
+          PY
           npx supabase start
 
       - name: Configure public catalog environment
@@ -267,6 +283,22 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
+          # Inbucket is not needed for catalog tests. Its default host port
+          # can collide with other services on shared GitHub runners.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path("supabase/config.toml")
+          contents = config.read_text()
+          match = re.search(r"(?ms)^\[inbucket\]\s*\n(.*?)(?=^\[|\Z)", contents)
+          if not match:
+              raise SystemExit("Missing Supabase inbucket configuration")
+          section = match.group(0)
+          updated, count = re.subn(r"(?m)^enabled\s*=\s*true\s*$", "enabled = false", section, count=1)
+          if count != 1:
+              raise SystemExit("Expected enabled Inbucket service in isolated test config")
+          config.write_text(contents[:match.start()] + updated + contents[match.end():])
+          PY
           npx supabase start
 
       - name: Configure public catalog environment
