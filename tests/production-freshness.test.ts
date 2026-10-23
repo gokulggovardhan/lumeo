@@ -34,7 +34,7 @@ function productionFetch(overrides: Record<string, Response> = {}) {
   return async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     const key = `${init?.method ?? "GET"} ${url.pathname}`;
-    if (overrides[key]) return overrides[key];
+    if (overrides[key]) return overrides[key].clone();
 
     switch (key) {
       case "GET /":
@@ -44,7 +44,9 @@ function productionFetch(overrides: Record<string, Response> = {}) {
       case "GET /pdf-tools":
         return response("<h1>All PDF tools</h1>", { headers: { "cache-control": "no-cache" } });
       case "GET /api/build-info":
-        return Response.json({ commit: sha, environment: "production" });
+        return Response.json({ commit: sha, environment: "production" }, { headers: { "cache-control": "no-store" } });
+      case "GET /phase11-this-route-does-not-exist":
+        return response('<h1>This page is not here.</h1><a href="/">Home</a><a href="/pdf">Workspace</a><a href="/pdf-tools">Tools</a>', { status: 404 });
       case "HEAD /_next/static/chunks/app-current.ABC123.js":
         return response(null, {
           headers: { "cache-control": "public, max-age=31536000, immutable" },
@@ -106,10 +108,39 @@ test("production freshness rejects publicly cached documents and a stale build S
     verifyProductionFreshness({
       expectedSha: sha,
       fetchImpl: productionFetch({
-        "GET /api/build-info": Response.json({ commit: "0".repeat(40), environment: "production" }),
+        "GET /api/build-info": Response.json({ commit: "0".repeat(40), environment: "production" }, { headers: { "cache-control": "no-store" } }),
       }),
     }),
     /build-info mismatch/,
   );
 });
 
+
+test("build metadata must be no-store even when its SHA matches", async () => {
+  await assert.rejects(verifyProductionFreshness({ expectedSha: sha, fetchImpl: productionFetch({
+    "GET /api/build-info": Response.json({ commit: sha, environment: "production" }),
+  }) }), /must use no-store/);
+});
+
+test("network failure records sanitized diagnostics and cannot pass", async () => {
+  const evidence: Array<{ networkError?: string }> = [];
+  await assert.rejects(verifyProductionFreshness({ expectedSha: sha, evidence, fetchImpl: async () => {
+    throw Object.assign(new Error("private document and proxy credential"), { cause: { code: "ENOTFOUND" } });
+  } }), /connection failed \(ENOTFOUND\)/);
+  assert.equal(evidence[0].networkError, "ENOTFOUND");
+  assert.doesNotMatch(JSON.stringify(evidence), /credential|private document/);
+});
+
+test("a soft 404 and a deployment changing mid-check both fail", async () => {
+  await assert.rejects(verifyProductionFreshness({ expectedSha: sha, fetchImpl: productionFetch({
+    "GET /phase11-this-route-does-not-exist": response("not found"),
+  }) }), /returned HTTP 200/);
+  let reads = 0;
+  const normal = productionFetch();
+  await assert.rejects(verifyProductionFreshness({ expectedSha: sha, fetchImpl: async (url, init) => {
+    if (String(url).endsWith("/api/build-info") && ++reads === 2) {
+      return Response.json({ commit: "f".repeat(40), environment: "production" }, { headers: { "cache-control": "no-store" } });
+    }
+    return normal(url, init);
+  } }), /changed during verification/);
+});

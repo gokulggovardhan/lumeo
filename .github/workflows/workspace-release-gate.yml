@@ -112,6 +112,24 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
+          # Inbucket is not needed for catalog tests. Its default host port
+          # can collide with other services on shared GitHub runners.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path("supabase/config.toml")
+          contents = config.read_text()
+          match = re.search(r"(?ms)^\[inbucket\][^\n]*\n.*?(?=^\[|\Z)", contents)
+          if match:
+              section = match.group(0)
+              updated, count = re.subn(r"(?m)^enabled\s*=\s*(?:true|false)\s*$", "enabled = false", section, count=1)
+              if not count:
+                  updated = section.rstrip() + "\n" + "enabled = false\n"
+              contents = contents[:match.start()] + updated + contents[match.end():]
+          else:
+              contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
+          config.write_text(contents)
+          PY
           npx supabase start
 
       - name: Configure public catalog environment
@@ -267,6 +285,24 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
+          # Inbucket is not needed for catalog tests. Its default host port
+          # can collide with other services on shared GitHub runners.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          config = Path("supabase/config.toml")
+          contents = config.read_text()
+          match = re.search(r"(?ms)^\[inbucket\][^\n]*\n.*?(?=^\[|\Z)", contents)
+          if match:
+              section = match.group(0)
+              updated, count = re.subn(r"(?m)^enabled\s*=\s*(?:true|false)\s*$", "enabled = false", section, count=1)
+              if not count:
+                  updated = section.rstrip() + "\n" + "enabled = false\n"
+              contents = contents[:match.start()] + updated + contents[match.end():]
+          else:
+              contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
+          config.write_text(contents)
+          PY
           npx supabase start
 
       - name: Configure public catalog environment
