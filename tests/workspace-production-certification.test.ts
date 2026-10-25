@@ -12,8 +12,11 @@ const productionSmoke = readFileSync(
 );
 
 test("production certification pins the exact deployed revision", () => {
-  assert.match(workflow, /github\.event\.pull_request\.base\.sha/);
+  // Only deployed main can be certified against live production; PRs are
+  // checked against their own candidate source by the Workspace release gate.
   assert.match(workflow, /github\.sha/);
+  assert.doesNotMatch(workflow, /github\.event\.pull_request\.base\.sha/);
+  assert.doesNotMatch(workflow, /\n  pull_request:/);
   assert.match(workflow, /\/api\/build-info/);
   assert.match(workflow, /deployed_environment/);
   assert.match(workflow, /production revision/);
