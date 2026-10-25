@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { L2PrivacyNote, L2UploadStage } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2UploadStage } from "@/components/pdf/workspace/ToolWorkspace";
 
 // Keep the first-visit PDF upload UI independent of the large editor,
 // OCR, shaping and native PDF rewrite modules. None of those modules is
@@ -77,7 +77,6 @@ export default function DeferredEditPdfTool() {
           }}
         />
       </div>
-      <L2PrivacyNote />
     </section>
   );
 }
