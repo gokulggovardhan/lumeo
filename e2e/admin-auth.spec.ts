@@ -289,16 +289,26 @@ test.describe("Control Center authentication", () => {
       .getByRole("checkbox", { name: "Enabled" });
     await expect(maintenanceAfterCancel).not.toBeChecked();
 
-    await maintenanceAfterCancel.check();
     const maintenanceFormAfterCancel = page.getByRole("form", {
       name: "Maintenance mode setting",
     });
-    await maintenanceFormAfterCancel
-      .getByRole("button", { name: "Save changes" })
-      .click();
-    await maintenanceFormAfterCancel
-      .getByRole("button", { name: "Enable maintenance mode" })
-      .click();
+    const maintenanceSaveAfterCancel = maintenanceFormAfterCancel.getByRole(
+      "button",
+      { name: "Save changes" },
+    );
+    // The prior rejected server action completes its HTTP response before
+    // WebKit has necessarily reconciled/hydrated the updated form. Do not
+    // race the confirmation click against that client transition.
+    await expect(maintenanceSaveAfterCancel).toHaveAttribute("data-client-ready", "true");
+    await expect(maintenanceSaveAfterCancel).toBeEnabled();
+    await maintenanceAfterCancel.check();
+    await expect(maintenanceAfterCancel).toBeChecked();
+    await maintenanceSaveAfterCancel.click();
+    const reenabledConfirmation = maintenanceFormAfterCancel.getByRole("alertdialog");
+    // Assert the actual safety dialog first: if React/server state lost the
+    // click, fail at this boundary rather than waiting 90s for an absent button.
+    await expect(reenabledConfirmation).toBeVisible();
+    await reenabledConfirmation.getByRole("button", { name: "Enable maintenance mode" }).click();
     await expect(page.getByText("Live: site is down for visitors")).toBeVisible();
 
     const enabledMaintenanceForm = page.getByRole("form", {
