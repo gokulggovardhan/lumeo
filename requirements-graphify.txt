@@ -17,7 +17,7 @@
 #
 # Neither failure announces itself. Both look like "the graph is churning".
 
-graphifyy[sql]==0.9.20
+graphifyy[sql]==0.9.70
 
 # DO NOT add the [leiden] or [all] extras. Both pull graspologic:
 #
