@@ -755,6 +755,15 @@ test.describe("browser conversion validation lab", () => {
       "Threaded Office client-navigation recovery is validated once in Chromium.",
     );
 
+    // This suite runs against a lazy Next development server because the
+    // internal conversion lab is intentionally development-only. Precompile
+    // the public Office entry once before starting the isolation-transition
+    // proof: HMR recompilation during a threaded Office bootstrap can freeze
+    // Chromium's main thread and prevent even the runtime's startup watchdog
+    // from firing. A fresh isolated page/runtime is still required below.
+    await page.goto("/pdf/word-to-pdf", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Word to PDF" }).first()).toBeVisible();
+
     await page.goto("/pdf-tools", { waitUntil: "domcontentloaded" });
     expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(false);
 
