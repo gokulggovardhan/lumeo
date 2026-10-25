@@ -651,7 +651,11 @@ export default function HtmlToPdfTool() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(blobUrl);
+      // Revoking the blob URL in the same task races the download handoff
+      // in mobile Safari/WebKit: the PDF is successfully generated but the
+      // browser never emits a download. Keep the local URL alive briefly,
+      // then release it; no bytes are uploaded or persisted.
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 
       track({
         eventName: "processing_succeeded",
