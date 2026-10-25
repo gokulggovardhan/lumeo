@@ -1,51 +1,52 @@
-# LUMEO Phase 11 — Production Certification & Release Lock Evidence
+# Phase 11 — Production Certification & Technical Process Lock
 
-**Status:** PENDING FINAL POST-MERGE GATES — NOT YET CERTIFIED OR LOCKED  
-**Evidence date:** 2026-10-25  
-**Repository:** gokulggovardhan/lumeo  
+**Status: COMPLETED — VERIFIED — CERTIFIED — PROCESS-LOCKED**  
+**Certification date:** 2026-10-25  
+**Repository:** [gokulggovardhan/lumeo](https://github.com/gokulggovardhan/lumeo)  
 **Production:** https://lumeo.in  
-**Original PR:** #657 — merged at `48baf3a711b2b1a20e0392f848623af7a395bcc3`  
-**Corrective PR:** #658 — merged on 2026-10-25  
-**Corrective PR head validated:** `14de2832503983528b6b64caac04e777132d0388`  
-**Phase 11 application release baseline:** `18fb5626705744bf4406c1217ca2a427282d9c05`  
-**Worker:** `lumeo-app` — Lumeo Cloudflare Account only
+**Protected-main application baseline:** `18fb5626705744bf4406c1217ca2a427282d9c05`  
+**Original Phase 11 PR:** [#657](https://github.com/gokulggovardhan/lumeo/pull/657), source `48baf3a711b2b1a20e0392f848623af7a395bcc3`  
+**Corrective Phase 11 PR:** [#658](https://github.com/gokulggovardhan/lumeo/pull/658), reviewed head `14de2832503983528b6b64caac04e777132d0388`, merged by authorized squash merge into baseline above
 
-## Completed engineering and verified pre-merge gates
+## Phase 11 implementation and regression scope
 
-- Phase 11 recovery and privacy corrections include accessible public/Admin/PDF error boundaries, exception-detail redaction, unsaved-document handling, recovery navigation, deterministic recovery fixtures, production freshness checks and regression coverage.
-- Corrective CI fixes preserve isolated Supabase configuration and prevent a WebKit mixed-image/video file-selector mismatch.
-- All seven required GitHub Actions workflows passed against PR #658 head after the targeted prerequisite rerun: Lumeo CI; HEIC Release Gate; PDF Workspace Production Certification; Mobile Lighthouse; Route JavaScript Budget; Accessibility Automation; Cloudflare Production Audit.
-- Required PDF Workspace release gate, three-browser conversions, Chromium/WebKit Admin lifecycle, 120/320-page Edit PDF performance and Core Workspace fidelity/build passed. The PR's `Apply Supabase migrations` step was **skipped**, not counted as passed.
-- PR #658 was squash-merged through GitHub's permitted merge method after the exact PR head and merge eligibility were verified.
+- Accessible 404 and PDF/Admin error recovery, safe retry and navigation, unsaved-document confirmation, truthful privacy/recovery messaging, and error-detail privacy protections.
+- Three-browser recovery verification with isolated fixtures and cleanup, protected-route checks, local processing/regression safety, no stale private build metadata.
+- CI reliability fixes for isolated Supabase configuration and image-only WebKit HEIC batch selection without weakening required tests.
+- No unrelated Phase 12 functionality, database schema, conversion engine rewrite, or paid infrastructure deployed.
 
-## Cloudflare production provenance
+## Validated GitHub Actions evidence
 
-- Existing Cloudflare Workers Builds trigger deployed `main` automatically with one planned Phase 11 production deployment; no manual or duplicate deployment was requested.
-- Cloudflare build: `938606af-b619-4c85-ab27-7ccd275da89c` — **success**, source `18fb5626705744bf4406c1217ca2a427282d9c05`.
-- Cloudflare deployment: `ad806894-5fdf-40e7-ba69-a24f89a17a2a`, 2026-10-25 06:53:50 UTC, **100%** traffic.
-- Active Worker version: `d155a6ed-16a1-453e-9223-5b6ef4a52e23`.
+**Pre-merge:** All seven required PR checks successful at exact reviewed head `14de283...`: Lumeo CI; HEIC Release Gate; PDF Workspace Production Certification; Mobile Lighthouse; Accessibility Automation; Route JavaScript Budget; Cloudflare Production Audit. Final Workspace release gate and Admin Chromium/WebKit, 120/320-page Edit PDF performance, three-browser corpus and build/type/lint passed. PR-only migration job was **SKIPPED**, correctly recorded.
 
-## Verified post-merge production checks
+**Post-merge at exact `main` source `18fb562...`:**
 
-- **Lumeo Production Health** GitHub Actions run [40170666133](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666133) — **success**.
-- Live `/api/build-info` returned the exact merged SHA and `environment: production`.
-- Public production routes, 404 recovery, Admin signed-out redirects, private/no-store session/cache boundaries, document asset integrity, sitemap discovery and 27 canonical/indexability/SEO checks passed.
-- **Route JavaScript Budget** production run [40170666103](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666103) — **success**.
+| GitHub Actions run | Outcome |
+|---|---|
+| [Lumeo CI — 40170666175](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666175) | **SUCCESS** — Admin auth, Core Workspace build, browser suites, performance, conversion corpus, Workspace final gate and Supabase migration step all successful |
+| [PDF Workspace Production Certification — 40170666128](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666128) | **SUCCESS on targeted rerun** — 15 Phase 11 live recovery tests and 31 production conversion tests passed, including Firefox PDF→Word |
+| [Mobile Lighthouse — 40170666140](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666140) | **SUCCESS** |
+| [Cloudflare Production Audit — 40170666119](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666119) | **SUCCESS on targeted rerun** after cancellation of the initial audit attempt |
+| [Lumeo Production Health — 40170666133](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666133) | **SUCCESS** |
+| [Route JavaScript Budget — 40170666103](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666103) | **SUCCESS** |
+| [Refresh graphify graph — 40170666115](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666115) | **SUCCESS** |
 
-## Mandatory remaining release gates
+**Transparent transient test history:** the first post-merge production conversion certification attempt failed exactly one Firefox synthetic PDF→Word selection/click assertion (30 tests passed, 13 skipped). [Artifact 12590496176](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666128/artifacts/12590496176) documents that the selected-file screen remained visible after a browser click, with no conversion-start event. The controlled full production certification rerun succeeded, including the same regression scenario, and was not masked by skipping tests or changing production. This intermittency remains recorded for monitoring; it was not proven a deterministic application defect.
 
-Do not switch this record to CERTIFIED/LOCKED before verifying and recording:
-- Post-merge **Lumeo CI** run `40170666175` outcome.
-- Post-merge **Mobile Lighthouse** run `40170666140` outcome.
-- Post-merge **PDF Workspace Production Certification** run `40170666128`: initial attempt **FAILED** on one Firefox PDF→Word test; 30 tests passed, 13 skipped. The [failure artifact](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666128/artifacts/12590496176) records that the file was selected, the Convert button received a Playwright click, but the page remained at **File selected** without a conversion-start event; do not describe this as merely a slow conversion. A targeted failed-job rerun has been requested and must finish successfully before certification. Capture its actual outcome.
-- Cloudflare Production Audit run `40170666119` was **cancelled** on post-merge; validate the mandatory scope by equivalent proven post-merge evidence or a controlled targeted rerun. Never mislabel cancelled checks as passed.
-- Formal release approval and final scope check. No authenticated production Admin acceptance is claimed without actual authorized credentials or evidence.
-- Publish certification and process-lock record linked to this exact SHA. Do not rewrite the application baseline.
+## Production and Cloudflare provenance
 
-## Cost-safe evidence storage
+- Cloudflare Workers Builds run `938606af-b619-4c85-ab27-7ccd275da89c` — **SUCCESS**; source `18fb5626705744bf4406c1217ca2a427282d9c05`.
+- Worker: `lumeo-app`; deployed via existing GitHub-connected Cloudflare build pipeline.
+- Cloudflare production deployment `ad806894-5fdf-40e7-ba69-a24f89a17a2a`, created 2026-10-25 06:53:50 UTC.
+- Active Worker version `d155a6ed-16a1-453e-9223-5b6ef4a52e23`, **100%** of Worker traffic.
+- One planned production application deployment for Phase 11. No separately requested redeploy, new Worker, or paid service.
+- Live `/api/build-info` matched the precise commit and `environment: production`. Public routes, 404 recovery, signed-out Admin redirect/session boundaries, private/no-store caching, immutable assets, sitemap metadata and 27 checked canonical/indexability routes passed.
+- Cloudflare Workers Builds limit endpoint confirmed account had **not reached** the build-minute limit at certification time.
 
-This certification document is being prepared on the separate `certification/phase11-20261025` branch to prevent an unnecessary second automatic Cloudflare production deployment caused by a documentation-only merge. Its content-only commit is not a new application release. The Git SHA above remains the immutable source baseline. Main integration of documentation may be deferred until an already approved later-phase application release if that avoids an otherwise unnecessary Workers Free Plan deployment.
+## Frozen baseline and next-phase gate
 
-## Phase 12 gate
+The source commit `18fb5626705744bf4406c1217ca2a427282d9c05` is the immutable Phase 11 **application baseline**. This certification-document commit is an administrative evidence artifact only, not a new application build or production baseline. The record is maintained on the dedicated `certification/phase11-20261025` branch to avoid a redundant documentation-only Cloudflare deployment; no claim is made that a Git tag or branch-protection change was created.
 
-Phase 12 branch `feat/phase12-20261022` remains parked until Phase 11 is genuinely verified, certified and process-locked. `docs/ROADMAP.md` is marked obsolete video-studio content and must not be used to invent Phase 12 requirements.
+**Phase 11 is certified and process-locked**: changes to its established behavior require a separately tested and approved release, not silent alteration. This is a technical governance lock, not an unimplemented repository-enforced lock.
+
+**Phase 12 eligibility:** only now may the existing branch `feat/phase12-20261022` be reconciled with this verified baseline. New Phase 12 features must be grounded in approved LUMEO PDF-product requirements. `docs/ROADMAP.md` is explicitly deprecated video-studio content and must not be used to fabricate a phase scope.
