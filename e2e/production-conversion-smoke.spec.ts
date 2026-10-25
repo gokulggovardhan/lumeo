@@ -666,9 +666,17 @@ test("production Word to PDF preserves professional formatting against native re
     timeout: 180_000,
   });
   await professionalConvertButton.click();
-  await expect(page.getByText("PDF ready")).toBeVisible({
-    timeout: 420_000,
-  });
+  // The native Office WASM binary can crash and show a recoverable error.
+  // Do not misdiagnose that as a seven-minute "slow PDF" success wait.
+  const ready = page.getByText("PDF ready");
+  const failure = page.getByRole("alert");
+  const outcome = await Promise.race([
+    ready.waitFor({ state: "visible", timeout: 330_000 }).then(() => "ready" as const),
+    failure.waitFor({ state: "visible", timeout: 330_000 }).then(() => "error" as const),
+  ]);
+  if (outcome === "error") {
+    throw new Error(`Word to PDF professional fidelity failed: ${await failure.innerText()}`);
+  }
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
