@@ -25,6 +25,15 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Handle multiple photos in one browser session",
       "Keep supported conversion local to the browser",
     ],
+    steps: [
+      "Add one or more HEIC or HEIF photos from your device.",
+      "Review the selected photos and start the browser-based conversion.",
+      "Download the new JPEG files while keeping the original HEIC files unchanged.",
+    ],
+    relatedTools: [
+      { href: "/pdf/jpg-to-pdf", label: "Convert JPG images to PDF" },
+      { href: "/pdf/pdf-to-jpg", label: "Convert PDF pages to JPG" },
+    ],
     faqs: [
       {
         question: "Are HEIC photos uploaded?",
@@ -219,6 +228,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Place and resize signatures or initials",
       "Keep supported signing work in the browser",
     ],
+    steps: [
+      "Add the PDF you want to sign.",
+      "Draw or type a signature or initials, then place and size it on the correct page.",
+      "Review the signed copy and export a new PDF when the placement is correct.",
+    ],
+    relatedTools: [
+      { href: "/pdf/edit", label: "Edit PDF online" },
+      { href: "/pdf/watermark", label: "Add a PDF watermark" },
+      { href: "/pdf/page-numbers", label: "Add PDF page numbers" },
+    ],
     faqs: [
       {
         question: "Is my signature stored by Lumeo?",
@@ -325,6 +344,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Control placement, opacity, and rotation",
       "Apply to all pages or selected page ranges",
     ],
+    steps: [
+      "Add the PDF you want to watermark.",
+      "Choose text or an image, then set placement, opacity, rotation, and page scope.",
+      "Preview the result and export the watermarked PDF when it looks correct.",
+    ],
+    relatedTools: [
+      { href: "/pdf/edit", label: "Edit PDF online" },
+      { href: "/pdf/page-numbers", label: "Add PDF page numbers" },
+      { href: "/pdf/header-footer", label: "Add PDF headers or footers" },
+    ],
     faqs: [
       {
         question: "Can I watermark only selected pages?",
@@ -372,6 +401,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Choose numbering position and style",
       "Control the starting number",
       "Apply numbering to a selected page range",
+    ],
+    steps: [
+      "Add the PDF that needs page numbers.",
+      "Choose the number style, position, starting value, and page range.",
+      "Preview pages with existing footer content, then export the numbered PDF.",
+    ],
+    relatedTools: [
+      { href: "/pdf/header-footer", label: "Add PDF headers or footers" },
+      { href: "/pdf/watermark", label: "Add a PDF watermark" },
+      { href: "/pdf/organize", label: "Organize PDF pages" },
     ],
     faqs: [
       {
