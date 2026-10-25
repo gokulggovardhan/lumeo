@@ -284,6 +284,17 @@ test.describe("Control Center authentication", () => {
     const rejectedEnableResponse = await implicitSubmitResponse;
     expect(rejectedEnableResponse.ok()).toBe(true);
 
+    // This is an intentionally raw requestSubmit() security probe, not a
+    // supported user interaction. Its rejected React server action can still
+    // be reconciling the RSC tree when WebKit receives the next synthetic
+    // click. Isolate the negative-security probe from the real confirmation
+    // lifecycle by reopening the route and waiting for hydrated controls.
+    // The following checks still exercise the complete real enable/disable
+    // experience rather than accepting a missing confirmation dialog.
+    await page.reload();
+    await expect(page).toHaveURL(/\\/admin\\/settings$/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
     const maintenanceAfterCancel = page
       .getByRole("form", { name: "Maintenance mode setting" })
       .getByRole("checkbox", { name: "Enabled" });
