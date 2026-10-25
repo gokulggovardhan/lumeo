@@ -37,7 +37,7 @@
 Do not switch this record to CERTIFIED/LOCKED before verifying and recording:
 - Post-merge **Lumeo CI** run `40170666175` outcome.
 - Post-merge **Mobile Lighthouse** run `40170666140` outcome.
-- Post-merge **PDF Workspace Production Certification** run `40170666128` outcome, including live browser conversion.
+- Post-merge **PDF Workspace Production Certification** run `40170666128`: initial attempt **FAILED** on one Firefox PDF→Word test; 30 tests passed, 13 skipped. The [failure artifact](https://github.com/gokulggovardhan/lumeo/actions/runs/40170666128/artifacts/12590496176) records that the file was selected, the Convert button received a Playwright click, but the page remained at **File selected** without a conversion-start event; do not describe this as merely a slow conversion. A targeted failed-job rerun has been requested and must finish successfully before certification. Capture its actual outcome.
 - Cloudflare Production Audit run `40170666119` was **cancelled** on post-merge; validate the mandatory scope by equivalent proven post-merge evidence or a controlled targeted rerun. Never mislabel cancelled checks as passed.
 - Formal release approval and final scope check. No authenticated production Admin acceptance is claimed without actual authorized credentials or evidence.
 - Publish certification and process-lock record linked to this exact SHA. Do not rewrite the application baseline.
