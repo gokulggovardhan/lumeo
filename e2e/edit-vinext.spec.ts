@@ -1840,8 +1840,18 @@ test("vinext Edit PDF applies one safe formatting transaction across mixed nativ
     const firstRun = editableRuns.nth(firstIndex);
     const secondRun = editableRuns.nth(secondIndex);
 
-    await firstRun.click();
-    await expect(firstRun).toHaveAttribute("aria-pressed", "true");
+    // In WebKit the rendered PDF preview parent can intercept a pointer
+    // click while the page is settling (captured in the failed trace).
+    // Use the overlay's real accessible Enter activation path, which calls
+    // the same onSelect state transition without relying on hit testing.
+    // Only activate if unselected; repeating Enter would toggle it off.
+    if ((await firstRun.getAttribute("aria-pressed")) !== "true") {
+      await firstRun.focus();
+      await firstRun.press("Enter");
+    }
+    await expect(firstRun).toHaveAttribute("aria-pressed", "true", {
+      timeout: 10_000,
+    });
 
     // WebKit can intermittently drop Playwright's synthetic click modifier
     // while focus moves from the inline editor to the next native run. Drive
