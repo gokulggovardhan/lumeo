@@ -37,6 +37,6 @@ test("Lightweight entry keeps upload readiness and exactly one tool-open tracker
   // The exact unchanged privacy promise must paint from the server shell,
   // not await Edit PDF client hydration (Lighthouse LCP regression).
   const serverPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
-  assert.match(serverPage, /<span>\{LOCAL_FIRST_SHORT\}<\\/span>/);
-  assert.doesNotMatch(entry, /<L2PrivacyNote\s*\\/>/);
+  assert.ok(serverPage.includes("<span>{LOCAL_FIRST_SHORT}</span>"));
+  assert.equal(entry.includes("<L2PrivacyNote />"), false);
 });
