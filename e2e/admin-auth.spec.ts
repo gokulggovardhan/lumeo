@@ -292,7 +292,7 @@ test.describe("Control Center authentication", () => {
     // The following checks still exercise the complete real enable/disable
     // experience rather than accepting a missing confirmation dialog.
     await page.reload();
-    await expect(page).toHaveURL(/\\/admin\\/settings$/);
+    expect(new URL(page.url()).pathname).toBe("/admin/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
     const maintenanceAfterCancel = page
