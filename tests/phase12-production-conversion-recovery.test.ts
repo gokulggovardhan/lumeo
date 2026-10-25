@@ -18,7 +18,7 @@ test("Office runtime fails a fatal trap without waiting five minutes or unsafe t
   assert.match(runtime, /isFatalOfficeRuntimeError\(message, event\.filename \|\| "", stack\)/);
   assert.match(runtime, /window\.addEventListener\("error", onFatalRuntimeError\)/);
   assert.match(runtime, /window\.removeEventListener\("error", onFatalRuntimeError\)/);
-  assert.match(runtime, /this\.fatalRuntimeError = new Error/);
+  assert.match(runtime, /this\.fatalRuntimeError = conversionUserError\("runtime-load-failed"/);\n  assert.match(runtime, /recoverable: false/);
   assert.match(runtime, /if \(this\.fatalRuntimeError\) throw this\.fatalRuntimeError/);
   assert.match(runtime, /finish\(reject, this\.fatalRuntimeError\)/);
   assert.doesNotMatch(runtime, /terminateAllThreads/);
