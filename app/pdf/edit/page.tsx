@@ -7,6 +7,7 @@ import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
+import { LOCAL_FIRST_SHORT } from "@/lib/public-site/copy";
 import DeferredEditPdfTool from "@/components/pdf/edit/DeferredEditPdfTool";
 
 const softwareSchema = buildSoftwareApplicationSchema({
@@ -77,6 +78,16 @@ export default function EditPdfPage() {
       <Suspense fallback={<EditPdfAvailabilityFallback />}>
         <EditPdfAvailabilityGate />
       </Suspense>
+
+      {/* Keep the privacy promise server-rendered. Lighthouse's LCP node was
+          the former client-only note, which appeared after hydration. This
+          public, non-sensitive sentence does not depend on document state. */}
+      <div className="l2-privacy-note mx-auto flex w-fit max-w-[560px] items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-raised)] px-4 py-2 text-center text-xs font-extrabold text-[var(--text-muted)]">
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-[var(--text-premium)]" fill="none">
+          <path d="M8 2.5 12 4v3.1c0 2.6-1.5 4.9-4 6.1-2.5-1.2-4-3.5-4-6.1V4l4-1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
+        </svg>
+        <span>{LOCAL_FIRST_SHORT}</span>
+      </div>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
