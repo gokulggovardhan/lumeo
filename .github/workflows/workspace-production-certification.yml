@@ -1,14 +1,10 @@
 name: PDF Workspace Production Certification
 
+# Live production tests certify only deployed main. PR candidates are verified by
+# the mandatory Lumeo CI Workspace release gate against their own head SHA;
+# testing the older live base on a corrective PR can never validate the fix.
+# Keep this exact-SHA certification mandatory after every main deployment.
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/workspace-production-certification.yml"
-      - "docs/PDF_WORKSPACE_PRODUCTION_CERTIFICATION.md"
-      - "tests/workspace-production-certification.test.ts"
-      - "e2e/production-conversion-smoke.spec.ts"
   push:
     branches:
       - main
@@ -44,11 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            expected_sha="${{ github.event.pull_request.base.sha }}"
-          else
-            expected_sha="${{ github.sha }}"
-          fi
+          expected_sha="${{ github.sha }}"
           echo "EXPECTED_SHA=$expected_sha" >> "$GITHUB_ENV"
           echo "Certifying production revision $expected_sha"
 

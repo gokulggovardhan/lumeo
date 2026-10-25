@@ -639,11 +639,18 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   await page.getByLabel("File name").fill("Production Rich HTML");
   await expect(page.getByLabel("HTML and CSS source")).toHaveValue(html);
 
-  let downloadPromise = page.waitForEvent("download");
   const generate = page.locator("button.lumeo-primary-action").first();
   await expect(generate).toContainText("Generate PDF");
-  await generate.click();
-  let download = await downloadPromise;
+  // The conversion can fail without an automatic download; surface the real
+  // UI error promptly instead of waiting the entire 8-minute test deadline.
+  const downloadOrError = async () => {
+    const download = page.waitForEvent("download", { timeout: 240_000 });
+    const failure = page.getByRole("alert").waitFor({ state: "visible", timeout: 240_000 })
+      .then(async () => { throw new Error(`HTML to PDF failed: ${await page.getByRole("alert").innerText()}`); });
+    await generate.click();
+    return Promise.race([download, failure]);
+  };
+  let download = await downloadOrError();
   await expect(generate).toBeEnabled();
   await expect(generate).toContainText("Generate PDF");
   expect(download.suggestedFilename()).toBe("production-rich-html.pdf");
@@ -657,9 +664,7 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   await replaceControlledText(page, "HTML and CSS source", repeatHtml);
   await page.getByLabel("File name").fill(`Repeat HTML ${testInfo.project.name}`);
   await expect(page.getByLabel("HTML and CSS source")).toHaveValue(repeatHtml);
-  downloadPromise = page.waitForEvent("download");
-  await generate.click();
-  download = await downloadPromise;
+  download = await downloadOrError();
   await expect(generate).toBeEnabled();
   await expect(generate).toContainText("Generate PDF");
   expect(download.suggestedFilename()).toBe(

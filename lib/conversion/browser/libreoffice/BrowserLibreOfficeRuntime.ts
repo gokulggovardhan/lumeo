@@ -4,6 +4,8 @@ import {
   type OfficeAssetConfig,
 } from "@/lib/conversion/browser/libreoffice/assetConfig";
 import { installOfficeClipboardPermissionCompatibility } from "@/lib/conversion/browser/libreoffice/permissionsCompat";
+import { isFatalOfficeRuntimeError } from "@/lib/conversion/browser/libreoffice/fatalRuntimeError";
+import { conversionUserError } from "@/lib/conversion/errors";
 
 const STARTUP_TIMEOUT_MS = 180_000;
 const READY_TIMEOUT_MS = 180_000;
@@ -360,11 +362,13 @@ export class BrowserLibreOfficeRuntime {
   private queue: Promise<unknown> = Promise.resolve();
   private startPromise: Promise<void> | null = null;
   private ready = false;
+  private fatalRuntimeError: Error | null = null;
 
   constructor(private readonly assets: OfficeAssetConfig) {}
 
   async start(signal: AbortSignal): Promise<void> {
     throwIfAborted(signal);
+    if (this.fatalRuntimeError) throw this.fatalRuntimeError;
     if (this.ready && this.helper) return;
 
     while (!this.ready) {
@@ -463,6 +467,7 @@ export class BrowserLibreOfficeRuntime {
         window.clearTimeout(timer);
         signal.removeEventListener("abort", onAbort);
         helper.thrPort.removeEventListener("message", onMessage);
+        window.removeEventListener("error", onFatalRuntimeError);
       };
 
       const finish = (
@@ -479,6 +484,22 @@ export class BrowserLibreOfficeRuntime {
       };
 
       const onAbort = () => finish(reject, abortError(signal), true);
+      // A native WASM trap can kill the Office conversion callback without
+      // delivering "convert-error". Fail the operation immediately instead
+      // of leaving the user at "Generating PDF" for the 5-minute watchdog.
+      // The Zeta worker cannot be safely restarted in this page; future
+      // attempts must explicitly require a clean browser reload.
+      const onFatalRuntimeError = (event: ErrorEvent) => {
+        const message = String(event.message || event.error?.message || "");
+        const stack = String(event.error?.stack || "");
+        if (!isFatalOfficeRuntimeError(message, event.filename || "", stack)) return;
+        this.fatalRuntimeError = conversionUserError("runtime-load-failed", {
+          message: "The local Office engine stopped unexpectedly. Reload this page before trying again.",
+          recoverable: false,
+          technicalMessage: "Fatal Office WebAssembly runtime trap.",
+        });
+        finish(reject, this.fatalRuntimeError);
+      };
       const onMessage = (event: MessageEvent<OfficeThreadMessage>) => {
         const message = event.data;
         if (
@@ -496,6 +517,7 @@ export class BrowserLibreOfficeRuntime {
       };
 
       signal.addEventListener("abort", onAbort, { once: true });
+      window.addEventListener("error", onFatalRuntimeError);
       helper.thrPort.addEventListener("message", onMessage);
       helper.thrPort.postMessage({
         cmd: "convert",
