@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type MouseEvent } from "react";
 import Link from "next/link";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import { AuraButton, L2PublicErrorState } from "@/components/ui/Aura";
 import { captureClientError } from "@/lib/errors/client";
 
 export default function PdfToolError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const { document, draftUnsavedChanges } = useWorkspaceDocument();
+  function confirmLeaving(event: MouseEvent<HTMLAnchorElement>) {
+    if ((document?.session.state.hasUnsavedChanges || draftUnsavedChanges) &&
+      !window.confirm("Leave this recovery screen? Unsaved PDF changes may be lost.")) {
+      event.preventDefault();
+    }
+  }
+
   useEffect(() => {
     void captureClientError({
       message: "PDF tool render failure",
@@ -23,9 +32,9 @@ export default function PdfToolError({ error, reset }: { error: Error & { digest
         actions={(
           <>
             <AuraButton type="button" onClick={reset}>Try again</AuraButton>
-            <Link href="/pdf" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">PDF Workspace</Link>
-            <Link href="/pdf-tools" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">PDF Tools</Link>
-            <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] transition hover:bg-[rgba(var(--paper-rgb),0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
+            <Link onClick={confirmLeaving} href="/pdf" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">PDF Workspace</Link>
+            <Link onClick={confirmLeaving} href="/pdf-tools" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">PDF Tools</Link>
+            <Link onClick={confirmLeaving} href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] transition hover:bg-[rgba(var(--paper-rgb),0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
               Back home
             </Link>
           </>

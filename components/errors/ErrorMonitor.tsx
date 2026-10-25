@@ -17,8 +17,7 @@ export function ErrorMonitor() {
       if (isNonActionableGlobalClientError(message)) return;
 
       void captureClientError({
-        message,
-        stack: event.error instanceof Error ? event.error.stack : null,
+        message: "Unhandled client error",
         source: "client",
         severity: "medium",
       });
@@ -30,8 +29,7 @@ export function ErrorMonitor() {
       if (isNonActionableGlobalClientError(message)) return;
 
       void captureClientError({
-        message,
-        stack: reason instanceof Error ? reason.stack : null,
+        message: "Unhandled client promise rejection",
         source: "unhandled_rejection",
         severity: "medium",
       });

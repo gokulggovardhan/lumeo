@@ -36,7 +36,7 @@ export default defineConfig({
   // defect that reproduces in dev alone needs saying so, and one that
   // reproduces in both is unambiguous.
   webServer: {
-    command: process.env.E2E_PROD ? "npm run start" : "npm run dev",
+    command: process.env.E2E_PROD ? "npm run start" : "npm run dev -- --hostname 127.0.0.1",
     url: "http://localhost:3000/pdf/edit",
     reuseExistingServer: !process.env.E2E_PROD,
     timeout: 180_000,
