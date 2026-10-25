@@ -29,6 +29,17 @@ Existing Cloudflare Workers Builds source trigger automatically ran once for mer
 
 **Post-merge Route JavaScript Budget [40181406162](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406162): SUCCESS**.
 
+## Post-merge failure and corrective engineering evidence (2026-10-25)
+
+The original Phase 12 production certification [40181406093](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406093) **FAILED**, not completed successfully: 29 passed, 2 failed, 13 project-scoped skips in approximately 24 minutes. Failure evidence [artifact 12594189826](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406093/artifacts/12594189826):
+
+- Chromium professional Word-to-PDF source triggered native Zeta/LibreOffice WASM runtime traps `operation does not support unaligned accesses` and `unreachable`. The UI displayed conversion failure; the pre-fix test waited 420 seconds for success instead of surfacing the error.
+- Mobile WebKit HTML-to-PDF did not emit a download event despite a returned idle "Generate PDF" button and no application error. Source revoked the generated Blob URL synchronously immediately after `link.click()`, a browser download-handoff race. The test waited its full 480-second limit.
+
+Phase 12 corrective [PR #664](https://github.com/gokulggovardhan/lumeo/pull/664) remains **OPEN / UNMERGED** at the present evidence checkpoint. Its changes defer PDF Blob URL release, detect fatal Office runtime traps and reject them safely without unsafe worker termination, make failure diagnostics prompt and actionable, add regression tests, and correct the workflow to certify the exact deployed `main` SHA only after deployment. A third-party native Office WASM trap is *not* automatically fixed by app-level fail-fast handling; it must be addressed or proven acceptably stable by subsequent mandatory release tests.
+
+**Never certify Phase 12 or begin Phase 13 until the corrective PR and exact production post-merge gates pass.**
+
 ## Pending mandatory gates
 
 Verify final success of post-merge:
