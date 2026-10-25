@@ -5,6 +5,7 @@ import {
 } from "@/lib/conversion/browser/libreoffice/assetConfig";
 import { installOfficeClipboardPermissionCompatibility } from "@/lib/conversion/browser/libreoffice/permissionsCompat";
 import { isFatalOfficeRuntimeError } from "@/lib/conversion/browser/libreoffice/fatalRuntimeError";
+import { conversionUserError } from "@/lib/conversion/errors";
 
 const STARTUP_TIMEOUT_MS = 180_000;
 const READY_TIMEOUT_MS = 180_000;
@@ -492,9 +493,11 @@ export class BrowserLibreOfficeRuntime {
         const message = String(event.message || event.error?.message || "");
         const stack = String(event.error?.stack || "");
         if (!isFatalOfficeRuntimeError(message, event.filename || "", stack)) return;
-        this.fatalRuntimeError = new Error(
-          "The local Office engine stopped unexpectedly. Reload this page before trying again.",
-        );
+        this.fatalRuntimeError = conversionUserError("runtime-load-failed", {
+          message: "The local Office engine stopped unexpectedly. Reload this page before trying again.",
+          recoverable: false,
+          technicalMessage: "Fatal Office WebAssembly runtime trap.",
+        });
         finish(reject, this.fatalRuntimeError);
       };
       const onMessage = (event: MessageEvent<OfficeThreadMessage>) => {
