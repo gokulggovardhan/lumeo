@@ -102,7 +102,7 @@ test("cannot confirm a tampered preview or smuggle fields into the creator paylo
   assert.throws(() => confirmFlowCreatorHandoff({
     ...draft,
     steps: [{ ...draft.steps[0]!, route: "/admin" }],
-  } as typeof draft, true), /preview changed/i);
+  } as unknown as typeof draft, true), /preview changed/i);
   assert.throws(() => confirmFlowCreatorHandoff({
     ...draft,
     endpoint: "https://leak.invalid",
