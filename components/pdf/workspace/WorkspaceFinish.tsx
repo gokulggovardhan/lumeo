@@ -13,6 +13,7 @@ import {
 import { visibleWorkspaceHistory } from "@/lib/pdf/workspace/presentation";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 import { WorkspaceJourney } from "./WorkspaceJourney";
+import { WorkspaceFlowCreator } from "./WorkspaceFlowCreator";
 
 function outputName(value: string): string {
   return `${sanitizeFileStem(value.replace(/\.pdf$/i, ""), "lumeo-finished")}.pdf`;
@@ -221,6 +222,11 @@ export function WorkspaceFinish() {
           </div>
         </div>
       </div>
+
+      <WorkspaceFlowCreator
+        key={`${currentDocument.id}:${currentDocument.revision.number}:${currentDocument.session.history.cursor}`}
+        session={currentDocument.session}
+      />
 
       <div
         className="sticky z-20 rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--v2-elevation-4)] backdrop-blur-xl"
