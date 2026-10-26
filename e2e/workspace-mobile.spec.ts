@@ -259,6 +259,12 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   // Client-side tool navigation preserves the dirty Workspace and its guard.
   await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(true);
 
+  // Phase 13: a page rotation is intentionally not a portable Flow action.
+  await expect(page.getByRole("heading", { name: "Create a reusable Flow" })).toBeVisible();
+  await page.getByRole("button", { name: "Review reusable steps" }).click();
+  await expect(page.getByText(/No portable Flow steps are available/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download Flow template (JSON)" })).toHaveCount(0);
+
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
   const download = await downloadPromise;
@@ -333,4 +339,54 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
       ),
     )
     .toBe("");
+});
+
+test("Phase 13 creator reviews completed local compression and downloads only portable JSON", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/pdf/compress", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles(TWO_PAGE_PDF);
+  // Analysis may recommend High quality for this fixture. Choose Balanced
+  // explicitly to prove that the creator preserves an actual user setting.
+  const balancedProfile = page.getByRole("button", { name: /Balanced/ });
+  await expect(balancedProfile).toBeVisible({ timeout: 90_000 });
+  await balancedProfile.click();
+  await expect(balancedProfile).toHaveAttribute("aria-pressed", "true");
+  const compressButton = page.getByRole("button", { name: "Compress PDF", exact: true });
+  await expect(compressButton).toBeEnabled({ timeout: 90_000 });
+  await compressButton.click();
+
+  // A successful real engine result must materialize before the creator can
+  // derive anything from the session; no test-only document state injection.
+  const continuation = page.getByRole("region", { name: "Continue with this PDF" });
+  await expect(continuation).toBeVisible({ timeout: 120_000 });
+  await continuation.getByRole("button", { name: "Finish", exact: true }).click();
+  await expect(page).toHaveURL(/\/pdf\/finish$/);
+
+  await page.getByRole("button", { name: "Review reusable steps" }).click();
+  await expect(page.getByRole("heading", { name: "Template preview" })).toBeVisible();
+  await expect(page.getByText("Balanced", { exact: true })).toBeVisible();
+  const save = page.getByRole("button", { name: "Download Flow template (JSON)" });
+  await expect(save).toBeDisabled();
+  await page.getByRole("checkbox", { name: /I reviewed the steps/ }).check();
+  await expect(save).toBeEnabled();
+
+  const downloadPromise = page.waitForEvent("download");
+  await save.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("lumeo-flow-v1.json");
+  const bytes = await readFile((await download.path())!);
+  const jsonText = bytes.toString("utf8");
+  expect(JSON.parse(jsonText)).toEqual({
+    version: 1,
+    steps: [{
+      type: "optimize.compress",
+      area: "optimize",
+      scope: "document",
+      options: { mode: "quality", profile: "balanced" },
+    }],
+  });
+  expect(jsonText).not.toMatch(/filename|sourceId|documentId|originalBytes|outputBytes|pdfBytes|https?:\/\//i);
+  await expect(page.getByRole("button", { name: "Download PDF" })).toBeVisible();
 });
