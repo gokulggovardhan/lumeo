@@ -1,67 +1,58 @@
-# LUMEO Phase 12 — Flows Foundation Release Evidence
+# LUMEO Phase 12 — Flows Foundation Production Certification & Process Lock
 
-**State: PENDING — POST-MERGE CERTIFICATION NOT YET COMPLETE**  
-**Evidence date:** 2026-10-25  
-**Production:** https://lumeo.in  
-**Repository:** gokulggovardhan/lumeo  
-**Phase 12 tracker:** [#662](https://github.com/gokulggovardhan/lumeo/issues/662)  
-**Implementation PR:** [#663](https://github.com/gokulggovardhan/lumeo/pull/663), squash-merged  
-**Original Phase 12 source:** `8e09fbe433bbdb595083a3fef435389095605961`  
-**Corrective deployed main (NOT YET CERTIFIED):** `00601389191ef53bc032be9b88f323b208eb45ba`  
-**Baseline preserved:** Phase 11 `18fb5626705744bf4406c1217ca2a427282d9c05`
+**Status: COMPLETED — VERIFIED — CERTIFIED — PROCESS-LOCKED**  
+**Certification date:** 2026-10-26  
+**Repository:** [gokulggovardhan/lumeo](https://github.com/gokulggovardhan/lumeo)  
+**Live production:** https://lumeo.in  
+**Protected-main application baseline:** `688c7ded2d4ab1c5bd7abb373267450d892631e1`  
+**Approved Phase 12 allocation:** [Issue #662](https://github.com/gokulggovardhan/lumeo/issues/662), mapped to outstanding Flows Foundation Stage 8 in [PDF Workspace program #399](https://github.com/gokulggovardhan/lumeo/issues/399).  
+**Protected Phase 11 predecessor:** `18fb5626705744bf4406c1217ca2a427282d9c05`
 
-## Approved scope
+## Certified implementation scope
 
-The authorized PDF Workspace roadmap issue #399 identifies Stage 8 as Flows foundation. Under current Phase 12 allocation #662, this release establishes a strict *non-executing* portable template domain boundary. It does **not** expose a public Flows UI or automatically execute PDF modifications.
+1. A strict, non-executing and private `lib/pdf/workspace/flows.ts` template boundary captures **applied** document-session history only (not undone branches).
+2. Portable Flow v1 allowlists document-wide compression quality profiles `highQuality`, `balanced` and `smaller`; the validator excludes unknown operations and parameters, page-specific modifications, filename and file contents, document/session/page IDs, signature details, private metadata, source sizes, target-size requests and non-local sessions.
+3. Flow JSON is v1 only, strict-key, at most 20 steps and 16 KiB; import and plan boundaries do not deserialize executable handlers, automatically modify a PDF, persist remotely or expose public Flows UI.
+4. Phase 12 post-merge production corrective work additionally hardened fatal browser Office WASM traps (safe failure instead of indefinite waiting), WebKit HTML-to-PDF blob download lifetime, Edit PDF browser overlay selection, Admin test isolation, browser conversion bootstrap under dev HMR and server-rendered Edit PDF privacy/LCP text.
+5. Existing PDF processing, privacy, protected Admin routes, accessibility, free Cloudflare Workers infrastructure and prior locked phase behavior are preserved.
 
-Files: `lib/pdf/workspace/flows.ts`, `tests/workspace-flows.test.ts`, `docs/PHASE_12_FLOWS_FOUNDATION.md`.
+**Limits:** This phase does NOT deliver Flow execution, user-visible Flow automation, persistence, cloud synchronization, remote PDF processing, support for arbitrary Flow plugins or per-document secure edits. A native third-party Office WASM trap was handled safely but not claimed to be repaired within the third-party binary.
 
-Security/privacy design: capture applied journal entries only; explicitly allowlist quality-profile full-document Compress operations; exclude document bytes, filenames, source/page/session IDs, descriptions, private metadata, signatures, document-specific targets and unrecognized operation parameters; validate imported Flow JSON with v1 schema, 20-step cap and 16 KiB limit; no cloud persistence or network calls.
+## Protected PR and source evidence
 
-## Pre-merge checks
+| Change | Protected-main merged source |
+|---|---|
+| [PR #663](https://github.com/gokulggovardhan/lumeo/pull/663) — Foundation | `8e09fbe433bbdb595083a3fef435389095605961` |
+| [PR #664](https://github.com/gokulggovardhan/lumeo/pull/664) — Runtime/WebKit corrections | `00601389191ef53bc032be9b88f323b208eb45ba` |
+| [PR #665](https://github.com/gokulggovardhan/lumeo/pull/665) — Edit PDF LCP and browser gate corrections | `688c7ded2d4ab1c5bd7abb373267450d892631e1` |
 
-All four PR #663 GitHub Actions workflows **SUCCESS** on head `8a76371a271faae99a8786d6efc877a7e81b1aff`: Lumeo CI including final required PDF Workspace validation, Accessibility Automation, Mobile Lighthouse and Route JavaScript Budget. Core unit/build suite passed **1,348/1,348 tests**, including six new focused Flows tests. Admin Chromium/WebKit, 3-browser conversion, Edit PDF 120/320-page performance, Workspace mobile and Edit browser checks passed. The PR-only migration job was correctly **SKIPPED**.
+The source was reviewed through required PR checks and normal permitted merges, not pushed over branch protection. Existing historical `feat/phase12-20261022` points to an older PR commit and is not the application release baseline; the exact protected-main SHA above governs this certification.
 
-## Cloudflare production provenance
+## Live Cloudflare Workers provenance
 
-Existing Cloudflare Workers Builds source trigger automatically ran once for merged `main` commit `8e09fbe...`, with **SUCCESS** build `8dce1020-de36-4b80-87f1-7340311b9212`. Production deployment `7bd455cb-9429-42c9-8e13-5520eecca5cd`, Worker `lumeo-app`, version `46612ca8-e231-498d-8a4d-f57f629a7e86`, 100% traffic on successful deploy. No duplicate/manual production deploy.
+Latest Cloudflare Workers Builds successful build: `f9ebf5b9-944a-491b-8d31-58ec98996858`, exact source `688c7ded2d4ab1c5bd7abb373267450d892631e1`.
 
-**Post-merge Production Health [40181406157](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406157): SUCCESS**; `/api/build-info` exact source SHA and environment production, public routes/404 recovery, Admin signed-out boundary, cache/security controls and 27 SEO sitemap routes passed.
+Production Worker `lumeo-app`, deployment `52f0b677-99e0-4138-af75-d17dc00e0fe3`, version `e2357beb-6e8c-4d6d-812d-f866ad9e6f70`, 100% traffic as of 2026-10-26 verification; initial deployment created 2026-10-25 13:49:30 UTC. The source and live `/api/build-info` both match `688c7de...` in production.
 
-**Post-merge Route JavaScript Budget [40181406162](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406162): SUCCESS**.
+**Production deployment count for Phase 12: three:** original PR #663 release, corrective PR #664, and performance correction PR #665. Later deployments were necessary for genuine test/performance defects, rather than per-commit deployment. No arbitrary duplicate build or paid service was added. At verification, Cloudflare account reported its build-minute limit had not been reached.
 
-## Post-merge failure and corrective engineering evidence (2026-10-25)
+## Mandatory post-merge production gate evidence on exact final SHA
 
-The original Phase 12 production certification [40181406093](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406093) **FAILED**, not completed successfully: 29 passed, 2 failed, 13 project-scoped skips in approximately 24 minutes. Failure evidence [artifact 12594189826](https://github.com/gokulggovardhan/lumeo/actions/runs/40181406093/artifacts/12594189826):
+| Mandatory verification | Outcome and evidence |
+|---|---|
+| [Lumeo CI 40199297510](https://github.com/gokulggovardhan/lumeo/actions/runs/40199297510) | **SUCCESS** — full core/build, Admin Chromium/WebKit, Workspace mobile and Edit browsers, 120/320-page performance, three-browser conversion corpus, final required Validate Workspace gate and Apply Supabase migrations all successful |
+| [PDF Workspace Production Certification 40199297419](https://github.com/gokulggovardhan/lumeo/actions/runs/40199297419) | **SUCCESS** — exact deployed revision; 15 three-browser Phase 11 recovery checks, 31 live conversion tests; routes and unauthenticated Admin boundary passed |
+| [Mobile Lighthouse 40199297694](https://github.com/gokulggovardhan/lumeo/actions/runs/40199297694) | **SUCCESS** — four routes, three isolated Lighthouse 13.5.0 samples each; `/pdf/edit` median mobile LCP **3974.85 ms**, unchanged requirement **<=4000 ms**, accessibility 0.99, performance 0.84, CLS 0 |
+| [Route JavaScript Budget 40199297322](https://github.com/gokulggovardhan/lumeo/actions/runs/40199297322) | **SUCCESS** — exact production bundle |
+| [Production Health 40199297477](https://github.com/gokulggovardhan/lumeo/actions/runs/40199297477) | **SUCCESS** — live exact revision, production routes and security/privacy/SEO boundary |
+| [Cloudflare Production Audit — 2026-10-26 run 40277870104](https://github.com/gokulggovardhan/lumeo/actions/runs/40277870104) | **SUCCESS** — post-deployment Cloudflare audit |
+| [Production Health — 2026-10-26 run 40272857374](https://github.com/gokulggovardhan/lumeo/actions/runs/40272857374) | **SUCCESS** — subsequent monitoring of same revision |
+| [Verify Error Fixes — 2026-10-26 run 40274192953](https://github.com/gokulggovardhan/lumeo/actions/runs/40274192953) | **SUCCESS** |
 
-- Chromium professional Word-to-PDF source triggered native Zeta/LibreOffice WASM runtime traps `operation does not support unaligned accesses` and `unreachable`. The UI displayed conversion failure; the pre-fix test waited 420 seconds for success instead of surfacing the error.
-- Mobile WebKit HTML-to-PDF did not emit a download event despite a returned idle "Generate PDF" button and no application error. Source revoked the generated Blob URL synchronously immediately after `link.click()`, a browser download-handoff race. The test waited its full 480-second limit.
+Initial corrective failures are retained in [Phase 12 tracker #662](https://github.com/gokulggovardhan/lumeo/issues/662): Office WASM trap, WebKit download timing, intermittent native overlay selection, dev HMR bootstrap, and mobile LCP regression. None are hidden as passes. All final required gates above are successful.
 
-Phase 12 corrective [PR #664](https://github.com/gokulggovardhan/lumeo/pull/664) was **MERGED** at exact source `00601389191ef53bc032be9b88f323b208eb45ba` after passing all candidate-head PR gates. The source is live via Cloudflare build `03c8f4d0-b3d4-4fe2-b18e-8e18047dc435`, production deployment `d2e7fec1-55ea-490d-9f9b-b57c75ac0cfe`, Worker version `c3d78f0a-f4a2-4072-8ccf-711ad7791f3d`, 100% traffic. Its changes defer PDF Blob URL release, detect fatal Office runtime traps and reject them safely without unsafe worker termination, make failure diagnostics prompt and actionable, add regression tests, and correct the workflow to certify the exact deployed `main` SHA only after deployment. A third-party native Office WASM trap is *not* automatically fixed by app-level fail-fast handling; it must be addressed or proven acceptably stable by subsequent mandatory release tests.
+## Permanent technical process-lock and handoff
 
-**Verified corrective post-merge at `006013...`:**
-- [Lumeo CI 40187010011](https://github.com/gokulggovardhan/lumeo/actions/runs/40187010011): SUCCESS including full Workspace and Supabase.
-- [PDF Workspace Production Certification 40187009998](https://github.com/gokulggovardhan/lumeo/actions/runs/40187009998): SUCCESS: 15 recovery + 31 conversion tests (roughly 6m36s vs failing original ~24m).
-- [Production Conversion Smoke 40187009954](https://github.com/gokulggovardhan/lumeo/actions/runs/40187009954): SUCCESS.
-- [Production Health 40187010018](https://github.com/gokulggovardhan/lumeo/actions/runs/40187010018): SUCCESS, exact `/api/build-info` SHA/environment.
-- [Cloudflare Production Audit 40187009967](https://github.com/gokulggovardhan/lumeo/actions/runs/40187009967): SUCCESS.
-- [Route JavaScript Budget 40187009973](https://github.com/gokulggovardhan/lumeo/actions/runs/40187009973): SUCCESS.
+The exact application release `688c7ded2d4ab1c5bd7abb373267450d892631e1` is the **certified immutable Phase 12 baseline**. The dedicated documentation/evidence branch `certification/phase12-20261025` preserves this certificate without triggering another documentation-only production deployment. That document commit is an audit record **not** a new application deployment or Git-enforced branch lock.
 
-**Outstanding performance blocker:** [Mobile Lighthouse 40187009942](https://github.com/gokulggovardhan/lumeo/actions/runs/40187009942) **FAILED**, real `/pdf/edit` median LCP **4131ms > 4000ms**. Lighthouse artifact 12597426274 confirmed static privacy-note span painted too late after deferred editor client hydration.
-
-**Corrective PR [#665](https://github.com/gokulggovardhan/lumeo/pull/665): IN PROGRESS**, candidate `ba0394881b8c337b2c1bf4d712ec9cc00aed3f9f`. It server-renders the identical privacy note, eliminates delayed client duplicate, updates stale legacy unit contract, and isolates a deliberate raw Admin server-action security probe from subsequent WebKit button lifecycle; retains all guard/confirmation tests. Earlier candidate-head Lighthouse [40188337484](https://github.com/gokulggovardhan/lumeo/actions/runs/40188337484) **SUCCESS** (PR-local `/pdf/edit` median 3095ms) but Lumeo CI [40188337550](https://github.com/gokulggovardhan/lumeo/actions/runs/40188337550) **FAILED** on legacy unit-test expectation and WebKit Admin fixture ordering; these have been corrected on the newer PR head. **Latest required CI checks are in progress**. No production LCP improvement is claimed yet.
-
-**Never certify Phase 12 or begin Phase 13 until PR #665 passes, is merged through branch protection, and exact-production post-merge 4000ms Lighthouse gate plus all other required checks pass.**
-
-## Current certification gates (updated)
-
-- Verify all PR #665 required checks pass on the exact final branch head.
-- Merge only through the permitted protected branch procedure.
-- Verify the exact merged main SHA, Cloudflare build/deployment/version and live build-info provenance.
-- Verify exact-production Mobile Lighthouse 3-sample median LCP <= 4000ms at /pdf/edit; do not alter the budget or skip routes.
-- Verify full Lumeo CI (including Supabase), production conversion certification, health, audit, security, and browser gates on that exact released SHA.
-- Retain known limitation: Flows execution, public UI, template persistence and automatic PDF mutation are NOT part of Phase 12.
-
-**Certification:** Not yet issued. **Technical process lock:** Not yet issued. **Phase 13:** Not authorized until Phase 12 fully certified.
-
-This evidence record lives in a dedicated certification branch to avoid an unnecessary documentation-only production redeployment. Its commit is administrative and is not the deployed application baseline.
+**Phase 12 is process-locked**: no silent modification to its certified behavior; changes require a separate protected-PR release with required evidence. Phase 13 may now begin under its own separately approved Stage 9 PDF Workspace specification. No phase beyond 13 may advance until Phase 13 passes its own mandatory development, QA, production certification and technical lock.
