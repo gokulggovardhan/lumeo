@@ -314,7 +314,12 @@ test.describe("Control Center authentication", () => {
     await expect(maintenanceSaveAfterCancel).toBeEnabled();
     await maintenanceAfterCancel.check();
     await expect(maintenanceAfterCancel).toBeChecked();
-    await maintenanceSaveAfterCancel.click();
+    // The first normal click above already verifies pointer confirmation.
+    // After the intentionally rejected raw form action, test an independent
+    // real keyboard activation so iPhone WebKit cannot lose a second
+    // synthetic pointer click while settling its server-action RSC tree.
+    // Enter MUST produce the same actual guarded confirmation dialog.
+    await maintenanceSaveAfterCancel.press("Enter");
     const reenabledConfirmation = maintenanceFormAfterCancel.getByRole("alertdialog");
     // Assert the actual safety dialog first: if React/server state lost the
     // click, fail at this boundary rather than waiting 90s for an absent button.
