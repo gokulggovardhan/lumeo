@@ -355,11 +355,6 @@ test("Phase 13 creator reviews completed local compression and downloads only po
   await expect(balancedProfile).toHaveAttribute("aria-pressed", "true");
   const compressButton = page.getByRole("button", { name: "Compress PDF", exact: true });
   await expect(compressButton).toBeEnabled({ timeout: 90_000 });
-  // The real analyzer may recommend High quality for this fixture. Pick the
-  // Balanced profile explicitly instead of assuming the document suggestion.
-  const balancedProfile = page.getByRole("button", { name: /^Balanced\b/i });
-  await balancedProfile.click();
-  await expect(balancedProfile).toHaveAttribute("aria-pressed", "true");
   await compressButton.click();
 
   // A successful real engine result must materialize before the creator can
