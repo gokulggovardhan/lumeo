@@ -347,6 +347,12 @@ test("Phase 13 creator reviews completed local compression and downloads only po
   const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
   await expect(upload).toBeAttached({ timeout: 30_000 });
   await upload.setInputFiles(TWO_PAGE_PDF);
+  // Analysis may recommend High quality for this fixture. Choose Balanced
+  // explicitly to prove that the creator preserves an actual user setting.
+  const balancedProfile = page.getByRole("button", { name: /^Balanced/ });
+  await expect(balancedProfile).toBeVisible({ timeout: 90_000 });
+  await balancedProfile.click();
+  await expect(balancedProfile).toHaveAttribute("aria-pressed", "true");
   const compressButton = page.getByRole("button", { name: "Compress PDF", exact: true });
   await expect(compressButton).toBeEnabled({ timeout: 90_000 });
   await compressButton.click();
