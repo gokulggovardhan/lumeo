@@ -59,6 +59,8 @@ test("creator handoff derives only applied history and never persists private do
   }
   assert.equal(serialized.includes("smaller"), false, "Undone operation entered the creator handoff");
   assert.equal(confirmFlowCreatorHandoff(draft, false), null);
+  assert.equal(confirmFlowCreatorHandoff(draft, "yes" as unknown as boolean), null);
+  assert.equal(confirmFlowCreatorHandoff(draft, 1 as unknown as boolean), null);
   assert.equal(JSON.stringify(s), before);
 });
 

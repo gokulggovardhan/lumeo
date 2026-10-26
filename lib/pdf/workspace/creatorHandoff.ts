@@ -108,7 +108,7 @@ export function confirmFlowCreatorHandoff(
   draft: CreatorFlowDraft,
   explicitlyConfirmed: boolean,
 ): CreatorFlowReviewHandoff | null {
-  if (!explicitlyConfirmed) return null;
+  if (explicitlyConfirmed !== true) return null;
   if (
     !isRecord(draft) ||
     !exactKeys(draft, [
