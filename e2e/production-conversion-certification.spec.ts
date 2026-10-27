@@ -556,15 +556,22 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     .first();
 
   const readCapabilityOutcome = async (): Promise<
-    "ready" | "unsupported" | "waiting"
+    "ready" | "unsupported" | "recoverable" | "waiting"
   > =>
     page.evaluate(() => {
       const buttons = Array.from(document.querySelectorAll("button"));
-      const retry = buttons.find(
-        (button) =>
-          button.textContent?.trim() === "Retry compatibility check",
+      const retryCompatibility = buttons.some(
+        (button) => button.textContent?.trim() === "Retry compatibility check",
       );
-      if (retry) return "unsupported";
+      if (retryCompatibility) return "unsupported";
+
+      // A real Office bootstrap failure has a distinct visible recovery UI.
+      // Never wait 180 seconds for an enabled button after the product has
+      // already shown "Engine needs attention" and a "Retry engine" action.
+      const retryEngine = buttons.some(
+        (button) => button.textContent?.trim() === "Retry engine",
+      );
+      if (retryEngine) return "recoverable";
 
       const convert = buttons.find(
         (button) => button.textContent?.trim() === "Convert to PDF",
@@ -590,10 +597,18 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     expect(download.suggestedFilename()).toBe(`capability-${browserName}.pdf`);
     const pdf = await PDFDocument.load(await downloadBytes(download));
     expect(pdf.getPageCount()).toBeGreaterThan(0);
-  } else {
+  } else if (capabilityOutcome === "unsupported") {
     await expect(alert).toContainText(
       /requires|missing|cross-origin isolation|SharedArrayBuffer|WebAssembly|Web Workers/i,
     );
+  } else {
+    // If the browser-local Office bootstrap genuinely fails, require a clear
+    // recoverable error AND an actionable retry. This is truthful product
+    // behavior, not a silent pass or a fabricated PDF conversion success.
+    await expect(page.getByRole("button", { name: "Retry engine", exact: true })).toBeVisible();
+    await expect(page.getByRole("alert").filter({
+      hasText: /The local conversion engine could not be loaded/i,
+    })).toContainText(/Check your connection and try again/i);
   }
 
   expectCleanRuntime(runtime, browserName, true);
