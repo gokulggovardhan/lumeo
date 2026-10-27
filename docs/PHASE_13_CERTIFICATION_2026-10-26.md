@@ -38,6 +38,17 @@ PR #668 was merged via allowed squash-merge at exact head, producing protected-m
 - [PDF Workspace Production Certification 40313324912](https://github.com/gokulggovardhan/lumeo/actions/runs/40313324912) — initial attempt **FAILED** on transient **HTTP 503 from /privacy**, after exact live release SHA and seven prior workspace routes passed. This is not categorized as an application defect without reproducible evidence. Targeted full-job rerun requested; its outcome must be verified; full live recovery and conversion tests cannot be skipped.
 - A production Cloudflare Audit is required under release policy if present/enabled; check most recent post-release schedule or controlled dispatch and record outcome. Do not label a cancelled or missing audit as success.
 
+## 27 October 2026 — corrective release deployed, certification still gated
+
+- PR [#669](https://github.com/gokulggovardhan/lumeo/pull/669) merged through authorized squash procedure after exact-head required Lumeo CI and Browser Conversion Validation passed.
+- Corrective protected-main SHA: `a7ff8a2b1c9793ea84c38701946579115cea00fe` (application release baseline candidate).
+- Cloudflare build `e3030114-5128-43b6-9743-3bbd8fedbacb` SUCCESS for exact new SHA; production deployment `929319f7-1a76-4479-9379-6e51b5a54272`, active version `3f7148fc-ac30-4cf1-9621-7b273e204359` at 100% traffic. No extra manual deployment.
+- PR #669 improves WebKit Admin recovery confirmation after deliberate raw security probe and treats Firefox Office runtime recoverable engine errors as visible recoverable failures rather than a 180-second wait. A recoverable error is NOT a successful PDF conversion or proof that the third-party engine was repaired.
+- Initial post-merge Phase 13 release had Admin WebKit failure and Firefox capability-classification failure. Traces: GitHub artifacts 12645997413 and 12646960620. Full post-merge corrective release gates still required.
+- Targeted pre-correction exact production Lighthouse rerun 40313325298 SUCCESS at unchanged 4000ms maximum: Home 3537.06ms; /pdf 3645.99ms; /pdf-tools 3669.89ms; /pdf/edit 3882.74ms (median of 3 isolated samples per route). Initial failed samples retained in historical CI.
+- Corrective post-merge Lumeo CI [40436195971](https://github.com/gokulggovardhan/lumeo/actions/runs/40436195971), production conversion certification [40436195853](https://github.com/gokulggovardhan/lumeo/actions/runs/40436195853), production conversion smoke [40436196102](https://github.com/gokulggovardhan/lumeo/actions/runs/40436196102) and health [40436195954](https://github.com/gokulggovardhan/lumeo/actions/runs/40436195954) must have actual SUCCESS outcomes recorded before issuance of certification. Latest health PASSED; remaining outcomes awaited at time of writing.
+- **NOT YET CERTIFIED OR LOCKED at this checkpoint. Phase 14 is parked.**
+
 ## Certification and next phase gating
 
 **Do not mark Phase 13 CERTIFIED or LOCKED** until every required post-merge workflow passes with the exact deployed application commit, including any 503 recovery explanation, data privacy checks and formal product acceptance. Do not start Phase 14 hardening until this gate succeeds. Once passed, issue a final Phase 13 certification/lock record and freeze the exact protected-main application SHA, leaving this documentation-only branch outside `main` to avoid unnecessary Workers deployment.
