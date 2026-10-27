@@ -1,0 +1,62 @@
+name: Phase14 Live WebKit Freshness QA
+
+# Isolated synthetic production acceptance only. This QA branch is never
+# merged into main and never deploys a Worker or writes production data.
+on:
+  push:
+    branches:
+      - qa/phase14-live-freshness-20261028
+    paths:
+      - scripts/phase14-live-freshness.mjs
+      - .github/workflows/phase14-live-webkit-freshness-qa.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase14-live-webkit-freshness-qa
+  cancel-in-progress: true
+
+jobs:
+  verify-production-webkit:
+    name: Live desktop + iPhone WebKit download and stale-output invalidation
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout isolated QA branch
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Use official Ubuntu archive for signed browser dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's@http://azure.archive.ubuntu.com/ubuntu@http://archive.ubuntu.com/ubuntu@g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+
+      - name: Install WebKit and system dependencies
+        run: npx playwright install --with-deps webkit
+
+      - name: Verify exact deployed SHA and live WebKit stale-output handling
+        env:
+          CI: "1"
+          EXPECTED_MAIN_SHA: "18f78691fb93be3f659a51e810bfdfd02aa44332"
+        run: xvfb-run -a node scripts/phase14-live-freshness.mjs
+
+      - name: Upload synthetic production acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase14-live-webkit-freshness-evidence
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 30
