@@ -100,3 +100,29 @@ This is a repository evidence record, not a Git-enforced lock, deployed applicat
 - PDF Workspace release gate prerequisite / Workspace release gate **SUCCESS** (job 122119092608). All five prerequisite jobs (Admin browser, Edit PDF 120/320 performance, core fidelity/build, conversion corpus, mobile/Edit browsers) **SUCCESS**.
 - Main `Validate Lumeo PDF Workspace` job 122119140574 **IN PROGRESS** at checkpoint, currently installing exact dependencies; later lint, architecture, unit, typecheck, app build, Cloudflare Worker build and Free Plan compatibility validation are pending. **Do not claim overall CI success, certification lock, or begin Phase 14 until final CI result is SUCCESS.**
 - Latest Cloudflare API read confirms deployment `0be1d79f-b64e-4bcb-9a28-38333bf05c9d`, version `0fdc1336-4341-45c8-a76d-b2e004d8768b` at 100%; protected main remains `3ffaad43d84baae0e574d2469778c3554b7b5b9b`. No new deployment required.
+
+
+## FINAL CERTIFICATION — 27 October 2026
+
+**PHASE13_VERIFIED_CERTIFIED_PROCESS_LOCKED (2026-10-27)**. This final section supersedes the older **in-progress** checkpoints above without rewriting their historical observations. The immutable **application** baseline is protected-main commit `3ffaad43d84baae0e574d2469778c3554b7b5b9b` from approved protected PR #670, preceded by Phase 13 PRs #668 and #669. Approved scope is PDF Workspace Stage 9 in issue #399, tracked in #667. The shipped handoff is local, opt-in and nonexecuting; it does **not** claim a Flow runner or remote processing.
+
+### Completed post-merge gates — exact deployed application SHA
+
+| Mandatory gate | GitHub run | Final outcome |
+| --- | --- | --- |
+| Lumeo CI, including all five prerequisite browser/performance/build jobs, Workspace aggregate, final lint/unit/type/build/Cloudflare Free compatibility and main Supabase migration job | [40476523718](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523718) | **SUCCESS; all eight jobs completed SUCCESS** |
+| PDF Workspace Production Certification, exact live build SHA, recovery/privacy and real multi-browser conversions (31 passed, capability skips distinguished) | [40476523761](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523761) | **SUCCESS** |
+| Production Conversion Smoke, including real mobile WebKit HTML-to-PDF fallback download and PDF output validation | [40476523741](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523741) | **SUCCESS** |
+| Mobile Lighthouse, four production routes, three isolated samples each, unchanged 4000 ms mobile LCP ceiling | [40476523738](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523738) | **SUCCESS** |
+| Lumeo Production Health, exact live build info, Admin/security, recovery, routes, SEO | [40476523782](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523782) | **SUCCESS** |
+| Route JavaScript Budget | [40476523708](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523708) | **SUCCESS** |
+| Push security analysis | [40476523380](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523380) | **SUCCESS** |
+| Fresh live Cloudflare security/routing and browser audit, rerun after release (but workflow checkout SHA is older) | [40459835277, attempt 2](https://github.com/gokulggovardhan/lumeo/actions/runs/40459835277) | **SUCCESS; live-site audit, not exact-head checkout** |
+
+The Lumeo CI browser corpus and final Validate job were previously still running; both completed successfully. Main Supabase migration job also **SUCCESS**, not a skipped PR-only job. PR-only conditionally skipped jobs in prior runs remain **SKIPPED** rather than reclassified as passes.
+
+**Lighthouse mobile LCP 3-sample medians:** Home 3927.57 ms; `/pdf` 3728.34 ms; `/pdf-tools` 3747.45 ms; `/pdf/edit` 3972.05 ms. All are under the existing 4000 ms budget; Edit PDF is close to the limit and should be a Stage 10 hardening priority without relaxing the threshold. Historical intermittent WebKit/Firefox, 503, and prior failed attempts are preserved above as regression risks; no guarantee of zero future errors is asserted.
+
+**Cloudflare Free production:** build `2387ba07-d1af-4570-b5eb-e9fdfe699c40` succeeded for exact source; deployment `0be1d79f-b64e-4bcb-9a28-38333bf05c9d`, Worker `lumeo-app`, version `0fdc1336-4341-45c8-a76d-b2e004d8768b`, **100% traffic**, confirmed again by Cloudflare API on 27 October 2026. No manual duplicate deployment or extra paid service.
+
+**Process lock:** Freeze the exact Phase 13 application SHA as immutable certified reference; future changes must use separately reviewed protected PRs with full exact-SHA post-merge production certification. This is an **evidence/process lock**, not a change to GitHub branch-protection rules, a Git tag, or an assertion that historical issues can never recur. Keep this document on its existing documentation-only certification branch to avoid triggering an unnecessary Cloudflare deployment. Phase 14 may start only after certification issue issuance and closure/lock of #667.
