@@ -77,3 +77,11 @@ This is a repository evidence record, not a Git-enforced lock, deployed applicat
 - Historical intermittent WebKit no-download, Firefox Office recoverable-error state, transient HTTP 503 and earlier Lighthouse failures remain in prior sections and are not silently removed.
 
 **Final gate:** inspect all post-merge completed jobs before changing this record to CERTIFIED/LOCKED, issuing certification issue, closing/locking tracker #667 or starting Phase 14.
+
+
+## 27 October 2026 — exact deployed production conversion passed
+
+- At protected main `3ffaad43d84baae0e574d2469778c3554b7b5b9b`, [PDF Workspace Production Certification #40476523761](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523761) completed **SUCCESS**. It first confirmed live `/api/build-info` exact SHA/environment at 08:53:43 UTC, then passed required routes, Admin boundary, 15 Phase 11 freshness/recovery tests, and real multi-browser conversion certification **31 passed** with expected capability-specific skips. In particular the actual mobile WebKit HTML→PDF conversion/download case #26 **PASSED**, and the final exact-SHA production freshness recheck passed. No failing browser conversions were counted as successes.
+- [Production Conversion Smoke #40476523741](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523741) **SUCCESS**, including real live mobile WebKit HTML→PDF download and PDF Workspace/Office handling; its logged real-browser suite reported **31 passed**, with browser-capability skips.
+- [Lumeo Production Health #40476523782](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523782) **SUCCESS**; [Route JavaScript Budget #40476523708](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523708) **SUCCESS**; GitHub security analysis push run #40476523380 **SUCCESS**.
+- **Not yet final certification**: [Lumeo CI #40476523718](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523718) and [Mobile Lighthouse #40476523738](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523738) remained **IN PROGRESS** at this entry. Cloudflare Audit last passed against prior SHA; need current production equivalent or accurate exception accounting. Hold process lock, tracker closure, and Phase 14.
