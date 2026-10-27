@@ -61,3 +61,19 @@ PR #668 was merged via allowed squash-merge at exact head, producing protected-m
 **Do not mark Phase 13 CERTIFIED or LOCKED** until every required post-merge workflow passes with the exact deployed application commit, including any 503 recovery explanation, data privacy checks and formal product acceptance. Do not start Phase 14 hardening until this gate succeeds. Once passed, issue a final Phase 13 certification/lock record and freeze the exact protected-main application SHA, leaving this documentation-only branch outside `main` to avoid unnecessary Workers deployment.
 
 This is a repository evidence record, not a Git-enforced lock, deployed application update or approval to bypass release protections.
+
+
+## 27 October 2026 — protected PR #670 merged and deployed (pending final gates)
+
+**STATUS: PENDING FINAL FULL RELEASE CERTIFICATION — NOT CERTIFIED OR LOCKED. Phase 14 parked.**
+
+- Verified PR #670 exact candidate `f40c0d10a6a37926abf3d9b0767756052016dc89` with five successful candidate workflows: Lumeo CI #40438412600, Browser Conversion Validation #40438412696, Mobile Lighthouse #40438412555, Accessibility Automation #40438412569, Route JavaScript Budget #40438412661. PR-only Apply Supabase migrations **SKIPPED**, not passed. No unresolved review threads; PR changes only HTML-to-PDF component, real-browser certification and focused tests.
+- Merged #670 with repository-authorized squash at reviewed exact head. Protected main commit **`3ffaad43d84baae0e574d2469778c3554b7b5b9b`**, verified by GitHub branch API and GitHub-signed commit; parent `a7ff8a2b1c9793ea84c38701946579115cea00fe`.
+- Existing Cloudflare Workers Builds GitHub push integration built **exact `3ffaad43...`** successfully, build **`2387ba07-d1af-4570-b5eb-e9fdfe699c40`**. Automated deployment **`0be1d79f-b64e-4bcb-9a28-38333bf05c9d`**, version **`0fdc1336-4341-45c8-a76d-b2e004d8768b`**, 100% active traffic, created 2026-10-27 08:53:31 UTC. No manual duplicate deployment.
+- Post-merge Lumeo Production Health run [#40476523782](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523782): **SUCCESS**. The job logs contain exact application SHA checks and a successful production freshness evidence artifact (#12720577718).
+- Route JavaScript Budget run [#40476523708](https://github.com/gokulggovardhan/lumeo/actions/runs/40476523708): **SUCCESS**. Main push security analysis run #40476523380: **SUCCESS**.
+- Post-merge **Lumeo CI #40476523718**, **Production Conversion Smoke #40476523741**, **PDF Workspace Production Certification #40476523761**, and **Mobile Lighthouse #40476523738** were **IN PROGRESS at this evidence checkpoint**. Require verified completed results including real three-browser PDF download bytes/page-count, Supabase migration status, Admin, security, accessibility, LCP, and exact revision recheck. Do not infer pass from workflow startup.
+- Latest scheduled Cloudflare Production Audit #40459835277 **SUCCESS** at 2026-10-27 06:13 UTC on prior source `a7ff8a2b...`; it is **not** a post-merge audit for `3ffaad43...`. Cloudflare deployment/version API and post-merge Production Health provide newer independent checks. Record new audit results if executed; never mislabel the earlier audit as exact-release success.
+- Historical intermittent WebKit no-download, Firefox Office recoverable-error state, transient HTTP 503 and earlier Lighthouse failures remain in prior sections and are not silently removed.
+
+**Final gate:** inspect all post-merge completed jobs before changing this record to CERTIFIED/LOCKED, issuing certification issue, closing/locking tracker #667 or starting Phase 14.
