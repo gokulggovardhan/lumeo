@@ -90,7 +90,10 @@ jobs:
   workspace-browsers:
     name: Workspace mobile and Edit browsers
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    # Three full browser engines plus local Cloudflare Worker Edit regression
+    # can exceed 55 minutes on slower hosted runners. Retain every test and
+    # performance/security budget; permit the complete suite to finish.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
