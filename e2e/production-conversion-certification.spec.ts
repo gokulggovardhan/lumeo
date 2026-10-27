@@ -656,9 +656,27 @@ test("production HTML to PDF preserves styled multi-page content and supports re
 
   const generate = page.locator("button.lumeo-primary-action").first();
   await expect(generate).toContainText("Generate PDF");
-  // The conversion can fail without an automatic download; surface the real
-  // UI error promptly instead of waiting the entire 8-minute test deadline.
+  // SSR can paint the button before WebKit hydrates the click handler.
+  // Waiting for real client readiness ensures a normal user action is tested.
+  await expect(generate).toHaveAttribute("data-generate-client-ready", "true");
+  await expect(generate).toBeEnabled();
+  // Non-mobile browsers continue proving the automatic download. Mobile
+  // Safari/WebKit additionally proves its explicit, user-gesture fallback:
+  // this is a real rendered PDF download and its bytes are fully inspected.
   const downloadOrError = async () => {
+    if (testInfo.project.name === "webkit-mobile-production-conversion") {
+      const fallback = page.getByRole("button", { name: "Download generated PDF" });
+      const failure = page.getByRole("alert");
+      await generate.click();
+      await expect.poll(async () => {
+        if (await failure.isVisible()) return `HTML to PDF failed: ${await failure.innerText()}`;
+        if (await fallback.isVisible()) return "ready";
+        return "waiting";
+      }, { timeout: 120_000 }).toBe("ready");
+      const download = page.waitForEvent("download", { timeout: 60_000 });
+      await fallback.click();
+      return download;
+    }
     const download = page.waitForEvent("download", { timeout: 240_000 });
     const failure = page.getByRole("alert").waitFor({ state: "visible", timeout: 240_000 })
       .then(async () => { throw new Error(`HTML to PDF failed: ${await page.getByRole("alert").innerText()}`); });

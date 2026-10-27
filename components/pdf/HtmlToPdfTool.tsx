@@ -541,12 +541,22 @@ export default function HtmlToPdfTool() {
   const [fileName, setFileName] = useState(initialDraft?.fileName ?? "lumeo-document");
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
+  const [generatedPdf, setGeneratedPdf] = useState<{ blob: Blob; fileName: string } | null>(null);
   const [continuation, setContinuation] = useState<{
     bytes: ArrayBuffer;
     fileName: string;
     pageCount: number;
     session: ReturnType<typeof createFreshPdfContinuation>["session"];
   } | null>(null);
+
+  // Keep the SSR-rendered Generate button inert until its real client handler
+  // has hydrated. Mobile WebKit can otherwise accept a pointer click without
+  // dispatching the browser-local PDF generation action.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setClientReady(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -583,9 +593,11 @@ export default function HtmlToPdfTool() {
     setSource(TEMPLATES.Blank);
     setError("");
     setContinuation(null);
+    setGeneratedPdf(null);
   }
 
   async function handleGenerate() {
+    if (!clientReady || isGenerating) return;
     const currentValidationError = validateHtmlSource(source);
     if (currentValidationError) {
       setError(currentValidationError);
@@ -595,6 +607,7 @@ export default function HtmlToPdfTool() {
     setIsGenerating(true);
     setError("");
     setContinuation(null);
+    setGeneratedPdf(null);
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "html-to-pdf" });
 
@@ -626,6 +639,10 @@ export default function HtmlToPdfTool() {
         margin,
       );
       const { blob, bytes, pageCount } = generated;
+      // Preserve a memory-only, user-gesture download fallback. WebKit/Safari
+      // may reject automatic anchor.click() after asynchronous canvas work,
+      // even when the Blob URL remains alive for 60 seconds.
+      setGeneratedPdf({ blob, fileName: outputFileName });
       try {
         const fresh = createFreshPdfContinuation({
           kind: "html-to-pdf",
@@ -797,13 +814,38 @@ export default function HtmlToPdfTool() {
                   <button
                     type="button"
                     onClick={() => void handleGenerate()}
-                    disabled={isGenerating || Boolean(validationError)}
+                    data-generate-client-ready={clientReady ? "true" : "false"}
+                    disabled={!clientReady || isGenerating || Boolean(validationError)}
                     className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
                   >
                     {isGenerating ? "Generating…" : "Generate PDF"}
                   </button>
                 }
               />
+              {generatedPdf ? (
+                <div role="status" aria-live="polite" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
+                  <p className="text-xs font-bold text-[var(--text-primary)]">PDF ready for download</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                    If your browser did not start the download automatically, use this button.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = URL.createObjectURL(generatedPdf.blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = generatedPdf.fileName;
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                    }}
+                    className="lumeo-focus-ring mt-3 min-h-11 rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 text-sm font-bold text-[var(--text-primary)]"
+                  >
+                    Download generated PDF
+                  </button>
+                </div>
+              ) : null}
               {error ? (
                 <div role="alert" className="rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
                   {error}
