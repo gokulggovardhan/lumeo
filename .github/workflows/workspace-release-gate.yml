@@ -90,7 +90,10 @@ jobs:
   workspace-browsers:
     name: Workspace mobile and Edit browsers
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    # Three full browser engines plus local Cloudflare Worker Edit regression
+    # can exceed 55 minutes on slower hosted runners. Retain every test and
+    # performance/security budget; permit the complete suite to finish.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -218,7 +221,9 @@ jobs:
   conversion-browsers:
     name: Conversion corpus on Chromium, WebKit and Firefox
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    # The Ubuntu package mirror can stall during Playwright OS dependency
+    # installation. Preserve all browser engines, dependencies, and tests.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
@@ -239,7 +244,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
 
       - name: Install Chromium, WebKit and Firefox
-        run: npx playwright install --with-deps chromium webkit firefox
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Azure's Ubuntu mirror stalled for over 40 minutes on the previous
+          # attempt. Use the official Ubuntu archive for the same signed
+          # packages; do not skip Playwright's required OS dependencies.
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's@http://azure.archive.ubuntu.com/ubuntu@http://archive.ubuntu.com/ubuntu@g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          npx playwright install --with-deps chromium webkit firefox
 
       - name: Run real browser conversion corpus
         env:

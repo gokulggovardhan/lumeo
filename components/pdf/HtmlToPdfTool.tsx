@@ -530,6 +530,7 @@ export default function HtmlToPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const inputRevisionRef = useRef(0);
 
   const initialDraft = useMemo(() => loadDraft(), []);
 
@@ -589,11 +590,18 @@ export default function HtmlToPdfTool() {
     return text ? text.split(/\s+/).length : 0;
   }, [source]);
 
+  // Any edit makes the previous PDF and Workspace handoff stale. A revision
+  // token also prevents an older async render from publishing after an edit.
+  function invalidateGeneratedOutput() {
+    inputRevisionRef.current += 1;
+    setGeneratedPdf(null);
+    setContinuation(null);
+  }
+
   function handleReset() {
     setSource(TEMPLATES.Blank);
     setError("");
-    setContinuation(null);
-    setGeneratedPdf(null);
+    invalidateGeneratedOutput();
   }
 
   async function handleGenerate() {
@@ -604,6 +612,7 @@ export default function HtmlToPdfTool() {
       return;
     }
 
+    const generationRevision = inputRevisionRef.current;
     setIsGenerating(true);
     setError("");
     setContinuation(null);
@@ -639,6 +648,12 @@ export default function HtmlToPdfTool() {
         margin,
       );
       const { blob, bytes, pageCount } = generated;
+      if (generationRevision !== inputRevisionRef.current) {
+        // The user edited the input during the asynchronous canvas render.
+        // Do not publish or download a PDF for an obsolete revision.
+        setError("The HTML or page settings changed while generating. Generate again to download the latest PDF.");
+        return;
+      }
       // Preserve a memory-only, user-gesture download fallback. WebKit/Safari
       // may reject automatic anchor.click() after asynchronous canvas work,
       // even when the Blob URL remains alive for 60 seconds.
@@ -713,7 +728,7 @@ export default function HtmlToPdfTool() {
                   type="button"
                   onClick={() => {
                     setSource(TEMPLATES[name]);
-                    setContinuation(null);
+                    invalidateGeneratedOutput();
                   }}
                   className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-xs font-bold text-[var(--text-primary)]"
                 >
@@ -735,7 +750,7 @@ export default function HtmlToPdfTool() {
               value={source}
               onChange={(event) => {
                 setSource(event.target.value);
-                setContinuation(null);
+                invalidateGeneratedOutput();
               }}
               spellCheck={false}
               aria-label="HTML and CSS source"
@@ -770,7 +785,7 @@ export default function HtmlToPdfTool() {
                 value={fileName}
                 onChange={(event) => {
                   setFileName(event.target.value);
-                  setContinuation(null);
+                  invalidateGeneratedOutput();
                 }}
                 className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm"
               />
@@ -779,7 +794,7 @@ export default function HtmlToPdfTool() {
               Page size
               <select value={pageSize} onChange={(event) => {
                 setPageSize(event.target.value as PageSize);
-                setContinuation(null);
+                invalidateGeneratedOutput();
               }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="a4">A4</option>
                 <option value="letter">Letter</option>
@@ -790,7 +805,7 @@ export default function HtmlToPdfTool() {
               Orientation
               <select value={orientation} onChange={(event) => {
                 setOrientation(event.target.value as Orientation);
-                setContinuation(null);
+                invalidateGeneratedOutput();
               }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
@@ -800,7 +815,7 @@ export default function HtmlToPdfTool() {
               Margin
               <select value={margin} onChange={(event) => {
                 setMargin(event.target.value as MarginPreset);
-                setContinuation(null);
+                invalidateGeneratedOutput();
               }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="none">None</option>
                 <option value="normal">Normal</option>

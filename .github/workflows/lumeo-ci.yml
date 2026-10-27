@@ -142,7 +142,9 @@ jobs:
   admin-browser-e2e:
     name: Admin auth — Chromium + WebKit
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # Playwright OS dependencies can stall on the hosted Azure Ubuntu mirror.
+    # Preserve the full Admin/Phase 11 browser and security suites.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -204,7 +206,16 @@ jobs:
           node scripts/verify-error-ingest-rate-limit.mjs
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium webkit firefox
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Match the proven conversion-corpus runner fix: use the official
+          # Ubuntu archive for the same signed OS dependencies, not the
+          # Azure mirror that stalled during the Admin retry.
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's@http://azure.archive.ubuntu.com/ubuntu@http://archive.ubuntu.com/ubuntu@g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          npx playwright install --with-deps chromium webkit firefox
 
       - name: Run public discovery hierarchy regression
         run: npx playwright test e2e/pdf-tools-discovery.spec.ts --project=chromium
