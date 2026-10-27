@@ -67,10 +67,13 @@ test("HTML to PDF produces multi-page output and supports repeat generation", as
   let pdf = await PDFDocument.load(bytes);
   expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
   expect(bytes.length).toBeGreaterThan(5_000);
+  const fallback = page.getByRole("button", { name: "Download generated PDF" });
+  await expect(fallback).toBeVisible();
 
   const repeatHtml =
     "<style>table{border-collapse:collapse}td{border:1px solid #333;padding:6px}</style><h1>Repeat conversion</h1><table><tr><td>Repeat</td><td>Works</td></tr></table><p>Unicode Ω λ 漢字.</p>";
   await replaceControlledText(page, "HTML and CSS source", repeatHtml);
+  await expect(fallback).toBeHidden(); // Never offer the previous PDF after an edit.
   await page.getByLabel("File name").fill(`HTML Repeat ${testInfo.project.name}`);
   await expect(page.getByLabel("HTML and CSS source")).toHaveValue(repeatHtml);
   downloadPromise = page.waitForEvent("download");
@@ -82,4 +85,7 @@ test("HTML to PDF produces multi-page output and supports repeat generation", as
   pdf = await PDFDocument.load(bytes);
   expect(pdf.getPageCount()).toBeGreaterThan(0);
   expect(bytes.length).toBeGreaterThan(1_000);
+  await expect(fallback).toBeVisible();
+  await page.getByLabel("Page size").selectOption("letter");
+  await expect(fallback).toBeHidden(); // Page layout changes invalidate the PDF too.
 });
