@@ -73,7 +73,9 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   });
   const uploads: string[] = [];
   page.on("request", (request) => { if (request.method() === "POST") uploads.push(request.url()); });
-  await page.locator('input[type="file"]').setInputFiles([
+  const photoInput = page.locator('input[type="file"]');
+  await expect(photoInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await photoInput.setInputFiles([
     { name: "CURRENT.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
     // Add the Live Photo companion separately: WebKit may discard the entire\n    // mixed file-input selection when a video is supplied alongside images.\n    // The picker should receive image files only; companion handling is tested\n    // through the drag-and-drop import path.\n
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
@@ -164,6 +166,7 @@ test("batch controls remove a selected file and convert-more resets cleanly", as
     return canvas.toDataURL("image/jpeg").split(",")[1];
   });
   const input = page.locator('input[type="file"]');
+  await expect(input).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
   await input.setInputFiles([
     { name: "keep.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
     { name: "remove.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") },

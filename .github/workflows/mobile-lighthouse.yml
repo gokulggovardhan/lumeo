@@ -62,7 +62,16 @@ jobs:
         run: npm ci
 
       - name: Install pinned Lighthouse runtime for CI only
-        run: npm install --no-save --package-lock=false lighthouse@13.5.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_dir="$RUNNER_TEMP/lumeo-lighthouse-runtime"
+          mkdir -p "$tool_dir"
+          npm install --prefix "$tool_dir" --no-save --package-lock=false lighthouse@13.5.0
+          test -f "$tool_dir/node_modules/lighthouse/cli/index.js"
+          test ! -e node_modules/lighthouse
+          ln -s "$tool_dir/node_modules/lighthouse" node_modules/lighthouse
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("node_modules/lighthouse/package.json","utf8"));if(p.version!=="13.5.0")process.exit(1)'
 
       - name: Initialize isolated Supabase catalog
         shell: bash
