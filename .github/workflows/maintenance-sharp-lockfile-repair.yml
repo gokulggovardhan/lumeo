@@ -1,0 +1,46 @@
+name: Maintenance Sharp Lockfile Repair
+on:
+  push:
+    branches:
+      - maintenance/20261028-next-security
+    paths:
+      - .github/workflows/maintenance-sharp-lockfile-repair.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regenerate:
+    name: Generate reviewed sharp dependency lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+      - name: Resolve patched sharp without install scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pkg set 'overrides.sharp=^0.35.5'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const l = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          if (!p.overrides?.sharp?.includes('0.35.5')) throw Error('sharp override missing');
+          const version = l.packages['node_modules/sharp']?.version;
+          if (version !== '0.35.5') throw Error('Expected sharp@0.35.5, got '+version);
+          const bundles = Object.entries(l.packages).filter(([key]) => key.startsWith('node_modules/@img/sharp-'));
+          if (!bundles.length || bundles.some(([,v]) => v.version !== '0.35.5' && v.optional !== true)) throw Error('Inconsistent sharp platform resolution');
+          console.log(JSON.stringify({sharp:version,platformPackages:bundles.length,versions:[...new Set(bundles.map(([,v])=>v.version))]},null,2));
+          JS
+          mkdir -p artifacts
+          cp package-lock.json artifacts/sharp-repaired-lock.json
+          cp package.json artifacts/sharp-repaired-package.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: maintenance-sharp-lockfile-repair
+          path: artifacts/sharp-repaired-*.json
+          if-no-files-found: error
+          retention-days: 2
