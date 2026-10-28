@@ -31,7 +31,7 @@ const docs = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 
 try {
   assert(packageJson.scripts["verify:lumeo2-workspaces"] === "node scripts/verify-lumeo-2-workspaces.mjs", "verify:lumeo2-workspaces script is missing.");
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.3", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
   assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 

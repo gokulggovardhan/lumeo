@@ -282,7 +282,7 @@ try {
   assert(!css.includes("#7ecbe8") && !css.includes("#45add5") && !css.includes("#2a87af"), "Blue-dominant public accent values must not remain in the semantic foundation.");
   assert(!ui.includes("rgba(var(--sky-rgb)"), "Shared UI components must not use sky-rgb as a public focus or action accent.");
   assert(packageJson.scripts["verify:lumeo2-foundation"] === "node scripts/verify-lumeo-2-foundation.mjs", "verify:lumeo2-foundation script is missing.");
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.3", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
   assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 
