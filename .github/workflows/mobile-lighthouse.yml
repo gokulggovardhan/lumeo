@@ -71,7 +71,7 @@ jobs:
           test -f "$tool_dir/node_modules/lighthouse/cli/index.js"
           test ! -e node_modules/lighthouse
           ln -s "$tool_dir/node_modules/lighthouse" node_modules/lighthouse
-          node -e 'if (require("lighthouse/package.json").version !== "13.5.0") process.exit(1)'
+          node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("node_modules/lighthouse/package.json","utf8"));if(p.version!=="13.5.0")process.exit(1)'
 
       - name: Initialize isolated Supabase catalog
         shell: bash
