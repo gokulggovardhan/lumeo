@@ -44,7 +44,16 @@ jobs:
         run: npm ci
 
       - name: Install pinned axe runtime for CI only
-        run: npm install --no-save --package-lock=false axe-core@4.10.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_dir="$RUNNER_TEMP/lumeo-axe-runtime"
+          mkdir -p "$tool_dir"
+          npm install --prefix "$tool_dir" --no-save --package-lock=false axe-core@4.10.3
+          test -f "$tool_dir/node_modules/axe-core/axe.min.js"
+          test ! -e node_modules/axe-core
+          ln -s "$tool_dir/node_modules/axe-core" node_modules/axe-core
+          node -e 'if (require("axe-core/package.json").version !== "4.10.3") process.exit(1)'
 
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
