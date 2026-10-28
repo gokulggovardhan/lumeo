@@ -35,7 +35,7 @@ const compressTool = read("components/pdf/CompressPdfTool.tsx");
 
 try {
   assert(packageJson.scripts["verify:lumeo2-public-experience"] === "node scripts/verify-lumeo-2-public-experience.mjs", "verify:lumeo2-public-experience script is missing.");
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.3", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
   assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 

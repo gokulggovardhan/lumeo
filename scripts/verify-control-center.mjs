@@ -343,7 +343,7 @@ try {
   assert(heicPage.includes('withSeoOverride("/heic-to-jpeg"'), "HEIC metadata must consume live Admin SEO overrides.");
 
   const packageJson = JSON.parse(read("package.json"));
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.3", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
   assert(packageJson.dependencies["react-dom"] === "^19.2.8", "React DOM version changed unexpectedly.");
   assert(packageJson.dependencies["firebase-admin"] === "^14.4.0", "firebase-admin version changed unexpectedly.");
