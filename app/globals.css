@@ -284,6 +284,13 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Long authenticated Admin forms and their sticky mobile header must not
+   continue animated scrolling while native pointer controls are in use.
+   Keep smooth-scroll design on all public Lumeo routes. */
+html:has([data-lumeo-admin-mobile-nav]) {
+  scroll-behavior: auto;
+}
+
 body {
   min-height: 100%;
   margin: 0;
