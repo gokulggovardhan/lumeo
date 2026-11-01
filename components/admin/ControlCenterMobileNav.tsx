@@ -53,17 +53,17 @@ export function ControlCenterMobileNav({
   }, [open]);
 
   return (
-    <header data-lumeo-admin-mobile-nav ref={wrapperRef} className="pointer-events-none fixed inset-x-0 top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
+    <header data-lumeo-admin-mobile-nav ref={wrapperRef} className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
       <div className="flex min-h-16 items-center justify-between gap-3 px-4">
         <a
           href="/admin"
-          className="pointer-events-auto rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-gold-rgb),0.16)]"
+          className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-gold-rgb),0.16)]"
           aria-label="Lumeo Admin Dashboard"
         >
           <BrandLockup markSize="h-8 w-8" />
         </a>
 
-        <div className="pointer-events-none min-w-0 flex-1 text-center">
+        <div className="hidden min-w-0 flex-1 text-center sm:block">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             {environment === "production" ? "Production" : environment} · Cloudflare · IST
           </p>
@@ -79,7 +79,7 @@ export function ControlCenterMobileNav({
           aria-expanded={open}
           aria-controls="admin-mobile-menu"
           onClick={() => setOpen((value) => !value)}
-          className="pointer-events-auto relative z-10 min-h-10 shrink-0 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
+          className="relative z-10 min-h-10 shrink-0 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
         >
           {open ? "Close" : "Menu"}
         </button>
@@ -88,7 +88,7 @@ export function ControlCenterMobileNav({
       {open ? (
         <div
           id="admin-mobile-menu"
-          className="pointer-events-auto absolute inset-x-3 top-[calc(100%+0.5rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[rgba(23,25,22,0.98)] p-3 shadow-[var(--shadow-xl)]"
+          className="absolute inset-x-3 top-[calc(100%+0.5rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[rgba(23,25,22,0.98)] p-3 shadow-[var(--shadow-xl)]"
         >
           <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-hairline)] bg-[rgba(var(--lumeo-paper-rgb),0.035)] p-3">
             <div className="min-w-0">
