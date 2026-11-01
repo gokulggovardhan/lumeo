@@ -52,7 +52,7 @@ export type ShapedRun = {
 };
 
 export type HarfBuzzRuntimeInfo = {
-  packageVersion: "1.6.2";
+  packageVersion: "1.6.4";
   engineVersion: string;
 };
 
@@ -225,7 +225,7 @@ function clusterMapFor(
 export async function getHarfBuzzRuntimeInfo(): Promise<HarfBuzzRuntimeInfo> {
   const hb = await loadHarfBuzz();
   return {
-    packageVersion: "1.6.2",
+    packageVersion: "1.6.4",
     engineVersion: hb.versionString(),
   };
 }

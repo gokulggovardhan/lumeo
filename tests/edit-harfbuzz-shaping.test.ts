@@ -139,8 +139,8 @@ function syntheticShapingFont(): Uint8Array {
 
 test("HarfBuzz runtime is pinned to the expected package and current core", async () => {
   const runtime = await getHarfBuzzRuntimeInfo();
-  assert.equal(runtime.packageVersion, "1.6.2");
-  assert.match(runtime.engineVersion, /^14\.5\.0(?:$|[-+])/);
+  assert.equal(runtime.packageVersion, "1.6.4");
+  assert.match(runtime.engineVersion, /^15\.0\.0(?:$|[-+])/);
 });
 
 test("HarfBuzz shapes a synthetic SFNT into deterministic glyph IDs and advances", async () => {
