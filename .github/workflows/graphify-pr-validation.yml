@@ -61,10 +61,38 @@ jobs:
           ]
           assert nodes and links, "Graphify returned an empty graph or topology"
           assert sql, "No .sql source nodes; the required SQL extractor may be missing"
+          node_ids = [str(node["id"]) for node in nodes]
+          assert len(node_ids) == len(set(node_ids)), "Duplicate graph node identities"
+          known = set(node_ids)
+          dangling = [
+              (link.get("source"), link.get("target"))
+              for link in links
+              if str(link.get("source")) not in known or str(link.get("target")) not in known
+          ]
+          assert not dangling, f"Dangling graph link endpoints: {dangling[:5]}"
+          assert all(Path(str(node["source_file"])).is_file() for node in sql), (
+              "SQL-source node refers to a missing source file"
+          )
           print(
               f"Reproduced read-only topology: {len(nodes)} nodes, "
               f"{len(links)} links, {len(sql)} SQL-source nodes"
           )
+          PY
+      - name: Verify repeatable AST topology without requiring deterministic communities
+        env:
+          GRAPHIFY_VIZ_NODE_LIMIT: "1"
+        run: |
+          cp graphify-out/graph.json /tmp/lumeo-graphify-first.json
+          graphify update . --force
+          python - <<'PY'
+          from scripts.graphify_fingerprint import fingerprint
+          first = fingerprint("/tmp/lumeo-graphify-first.json")
+          second = fingerprint("graphify-out/graph.json")
+          assert first["topology"] == second["topology"], (
+              f"Topology changed between identical inputs: {first['topology']} vs {second['topology']}"
+          )
+          assert first["nodes"] == second["nodes"] and first["links"] == second["links"]
+          print(f"PASS repeated graphify topology: {second['topology']}")
           PY
       - name: Report uncommitted generated differences for reviewer
         run: |
