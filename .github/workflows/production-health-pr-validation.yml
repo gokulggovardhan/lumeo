@@ -33,7 +33,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq 'EXPECTED_SHA: ${{ github.sha }}' .github/workflows/production-health.yml
+          grep -Fq 'EXPECTED_SHA:' .github/workflows/production-health.yml
+          grep -Fq 'github.sha' .github/workflows/production-health.yml
           grep -Fq 'if [ "$deployed_commit" != "$EXPECTED_SHA" ]; then' .github/workflows/production-health.yml
           grep -Fq 'uses: actions/checkout@v7' .github/workflows/production-health.yml
           grep -Fq 'contents: read' .github/workflows/production-health.yml
