@@ -1,0 +1,69 @@
+# This check tests the checkout v7 production-health candidate on a PR,
+# without comparing the deployed SHA to the unmerged PR merge ref.
+# The existing push/main production-health gate is deliberately unchanged.
+name: Validate Production Health Workflow PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-health.yml"
+      - ".github/workflows/production-health-pr-validation.yml"
+      - "scripts/verify-production-freshness.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-production-health:
+    name: Validate checkout and read-only production-health checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out candidate with current action
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify protected production revision check is preserved
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'EXPECTED_SHA: ${{ github.sha }}' .github/workflows/production-health.yml
+          grep -Fq 'if [ "$deployed_commit" != "$EXPECTED_SHA" ]; then' .github/workflows/production-health.yml
+          grep -Fq 'uses: actions/checkout@v7' .github/workflows/production-health.yml
+          grep -Fq 'contents: read' .github/workflows/production-health.yml
+          test -f scripts/verify-production-freshness.mjs
+          echo "PASS candidate retains exact-SHA production freshness gate and read-only permissions."
+      - name: Verify representative live production routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in / /pdf /pdf/merge /pdf/split /pdf/compress /robots.txt /sitemap.xml; do
+            status="$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 30 "https://lumeo.in$route")"
+            test "$status" = "200" || { echo "FAIL $route: HTTP $status"; exit 1; }
+            echo "PASS $route: HTTP 200"
+          done
+      - name: Verify live production revision metadata without comparing to PR HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          json="$(curl --silent --show-error --fail --max-time 30 'https://lumeo.in/api/build-info')"
+          printf '%s' "$json" | node -e '
+            let body = "";
+            process.stdin.on("data", chunk => body += chunk);
+            process.stdin.on("end", () => {
+              const data = JSON.parse(body);
+              if (data.environment !== "production" || !/^[0-9a-f]{40}$/i.test(data.commit || "")) {
+                console.error("FAIL: production build-info lacks a valid environment/commit");
+                process.exit(1);
+              }
+              console.log("PASS: deployed production revision", data.commit);
+            });
+          '
+          code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 30 'https://lumeo.in/admin')"
+          case "$code" in 302|303|307|308) echo "PASS protected Admin redirects (HTTP $code)";; *) echo "FAIL: protected Admin returned HTTP $code"; exit 1;; esac
