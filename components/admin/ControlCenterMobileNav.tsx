@@ -63,7 +63,7 @@ export function ControlCenterMobileNav({
           <BrandLockup markSize="h-8 w-8" />
         </a>
 
-        <div className="min-w-0 flex-1 text-center">
+        <div className="pointer-events-none min-w-0 flex-1 text-center">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             {environment === "production" ? "Production" : environment} · Cloudflare · IST
           </p>
@@ -79,7 +79,7 @@ export function ControlCenterMobileNav({
           aria-expanded={open}
           aria-controls="admin-mobile-menu"
           onClick={() => setOpen((value) => !value)}
-          className="min-h-10 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
+          className="relative z-10 min-h-10 shrink-0 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
         >
           {open ? "Close" : "Menu"}
         </button>
