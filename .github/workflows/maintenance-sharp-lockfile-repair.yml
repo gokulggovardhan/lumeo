@@ -1,46 +1,64 @@
 name: Maintenance Sharp Lockfile Repair
+# Temporary release-preparation workflow. Remove after audited lockfile is committed.
 on:
   push:
     branches:
       - maintenance/20261028-next-security
     paths:
       - .github/workflows/maintenance-sharp-lockfile-repair.yml
-  workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   regenerate:
-    name: Generate reviewed sharp dependency lockfile
+    name: Canonicalize exact sharp 0.35.5 dependency lock
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
       - uses: actions/setup-node@v7
         with:
           node-version: "24.x"
-      - name: Resolve patched sharp without install scripts
+          package-manager-cache: false
+      - name: Confirm this is the intended isolated maintenance candidate
         shell: bash
         run: |
           set -euo pipefail
-          npm pkg set 'overrides.sharp=^0.35.5'
+          node -e 'const p=require("./package.json"); if(p.dependencies.next!=="^16.4.3" || p.overrides?.sharp!=="0.35.5") process.exit(1)'
+      - name: Resolve canonical patched native sharp packages with npm
+        shell: bash
+        run: |
+          set -euo pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           node --input-type=module <<'JS'
           import fs from 'node:fs';
-          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const l = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          if (!p.overrides?.sharp?.includes('0.35.5')) throw Error('sharp override missing');
-          const version = l.packages['node_modules/sharp']?.version;
-          if (version !== '0.35.5') throw Error('Expected sharp@0.35.5, got '+version);
-          const bundles = Object.entries(l.packages).filter(([key]) => key.startsWith('node_modules/@img/sharp-'));
-          if (!bundles.length || bundles.some(([,v]) => v.version !== '0.35.5' && v.optional !== true)) throw Error('Inconsistent sharp platform resolution');
-          console.log(JSON.stringify({sharp:version,platformPackages:bundles.length,versions:[...new Set(bundles.map(([,v])=>v.version))]},null,2));
+          const p = JSON.parse(fs.readFileSync('package.json','utf8'));
+          const l = JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          if (p.overrides.sharp !== '0.35.5') throw Error('Sharp override not pinned');
+          if (l.packages['node_modules/sharp']?.version !== '0.35.5') throw Error('Sharp not patched');
+          const sharpBinaries=Object.entries(l.packages).filter(([k]) => k.startsWith('node_modules/@img/sharp-') && !k.includes('sharp-libvips'));
+          if (sharpBinaries.length < 8 || sharpBinaries.some(([,v]) => v.version !== '0.35.5')) throw Error('Inconsistent sharp binaries');
+          const vips=Object.entries(l.packages).filter(([k]) => k.startsWith('node_modules/@img/sharp-libvips-'));
+          if (vips.length < 8 || vips.some(([,v]) => v.version !== '1.3.4')) throw Error('Inconsistent libvips platforms');
+          console.log('PASS SHARP_0_35_5_BINARY_PLATFORM_COUNT',sharpBinaries.length);
+          console.log('PASS SHARP_LIBVIPS_1_3_4_PLATFORM_COUNT',vips.length);
           JS
-          mkdir -p artifacts
-          cp package-lock.json artifacts/sharp-repaired-lock.json
-          cp package.json artifacts/sharp-repaired-package.json
-      - uses: actions/upload-artifact@v7
-        with:
-          name: maintenance-sharp-lockfile-repair
-          path: artifacts/sharp-repaired-*.json
-          if-no-files-found: error
-          retention-days: 2
+      - name: Verify reproducible dependency installation
+        run: npm ci --no-audit --no-fund
+      - name: Verify Sharp loads on the isolated CI runner
+        run: node -e 'const s=require("sharp"); if(s.versions.sharp!=="0.35.5") throw Error("Unexpected sharp binary "+s.versions.sharp); console.log("PASS_SHARP_NATIVE",s.versions.sharp)'
+      - name: Commit canonical lockfile only to this maintenance PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'PASS_CANONICAL_LOCK_ALREADY_MATCHES'
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "fix(security): lock sharp 0.35.5 and compatible libvips native packages"
+          git push origin "HEAD:maintenance/20261028-next-security"
