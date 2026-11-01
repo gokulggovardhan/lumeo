@@ -207,7 +207,9 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
     const qualityPage = await page.context().newPage();
     try {
     await qualityPage.goto("/heic-to-jpeg");
-    await qualityPage.locator('input[type="file"]').setInputFiles(fixture!);
+    const qualityInput = qualityPage.locator('input[type="file"]');
+    await expect(qualityInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+    await qualityInput.setInputFiles(fixture!);
     await expect(qualityPage.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
     await qualityPage.getByLabel("Quality").selectOption(quality);
     await qualityPage.getByRole("button", { name: "Convert to JPEG" }).click();
@@ -247,7 +249,9 @@ test("full-resolution batch isolates corruption and ZIP keeps full JPEG dimensio
 
   const heic = await readFile(fixture!);
   await page.goto("/heic-to-jpeg");
-  await page.locator('input[type="file"]').setInputFiles([
+  const batchInput = page.locator('input[type="file"]');
+  await expect(batchInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await batchInput.setInputFiles([
     { name: "FULL_A.HEIC", mimeType: "image/heic", buffer: heic },
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
     { name: "FULL_B.HEIC", mimeType: "image/heic", buffer: heic },
@@ -286,7 +290,9 @@ test("malicious HEIF structures fail per-file before poisoning the next valid co
   const { itemFlood, auxCycle, longReferenceChain } = maliciousHeifFixtures();
 
   await page.goto("/heic-to-jpeg");
-  await page.locator('input[type="file"]').setInputFiles([
+  const securityInput = page.locator('input[type="file"]');
+  await expect(securityInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await securityInput.setInputFiles([
     { name: "ITEM-FLOOD.HEIC", mimeType: "image/heic", buffer: itemFlood },
     { name: "AUX-CYCLE.HEIC", mimeType: "image/heic", buffer: auxCycle },
     { name: "LONG-IREF-CHAIN.HEIC", mimeType: "image/heic", buffer: longReferenceChain },
