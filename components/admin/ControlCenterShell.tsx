@@ -35,6 +35,8 @@ export function ControlCenterShell({
                 environment={environment}
                 revision={revision}
               />
+              {/* Reserve the mobile fixed header height without moving its tap target during scroll. */}
+              <div aria-hidden="true" className="h-16 lg:hidden" />
               <AdminTopbar
                 email={email}
                 role={role}

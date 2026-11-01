@@ -53,7 +53,7 @@ export function ControlCenterMobileNav({
   }, [open]);
 
   return (
-    <header data-lumeo-admin-mobile-nav ref={wrapperRef} className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
+    <header data-lumeo-admin-mobile-nav ref={wrapperRef} className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
       <div className="flex min-h-16 items-center justify-between gap-3 px-4">
         <a
           href="/admin"
