@@ -145,7 +145,7 @@ try {
   assert(!/\.insert\(|\.update\(|\.delete\(/.test(data), "Public catalog data layer must not write.");
 
   const packageJson = JSON.parse(read("package.json"));
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.3", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
   assert(packageJson.dependencies["react-dom"] === "^19.2.8", "React DOM version changed unexpectedly.");
 
