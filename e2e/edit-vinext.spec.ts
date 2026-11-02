@@ -138,7 +138,7 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   );
   await expect(pageCapability).toHaveAttribute("title", /clipping shape/i);
 
-  const explanation = page.locator("[data-edit-capability-explanation]");
+  const explanation = limitedRun.locator("[data-edit-capability-explanation]");
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await limitedRun.hover({ force: attempt === 1 });
     try {
@@ -189,7 +189,7 @@ test("vinext Edit PDF keeps Type3 glyph-program text read-only", async ({
   await expect(pageCapability).toHaveAttribute("title", /PDF-drawn font/i);
 
   await limitedRun.hover();
-  const explanation = page.locator("[data-edit-capability-explanation]");
+  const explanation = limitedRun.locator("[data-edit-capability-explanation]");
   // The CSS hover surface must actually show the explanation, not only
   // contain correct hidden text. This catches pointer/overlay regressions.
   await expect(explanation).toBeVisible();
@@ -227,7 +227,7 @@ test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
   );
 
   await hiddenRun.hover();
-  const explanation = page.locator("[data-edit-capability-explanation]");
+  const explanation = hiddenRun.locator("[data-edit-capability-explanation]");
   await expect(explanation).toBeVisible();
   await expect(explanation).toContainText(/invisible PDF text layer/i);
   await expect(explanation).toContainText(/read-only/i);
