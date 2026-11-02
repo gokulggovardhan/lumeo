@@ -118,7 +118,7 @@ test.describe("Control Center authentication", () => {
     expect(overflow).toBe(false);
   });
 
-  test("login, persistence, navigation, realtime, logout, back protection and re-login", async ({ page }) => {
+  test("login, session persistence and full responsive Admin route navigation", async ({ page }) => {
     expect(
       hasAdminCredentials,
       "Disposable local admin credentials are required for the authenticated lifecycle test.",
@@ -243,6 +243,23 @@ test.describe("Control Center authentication", () => {
     const { navigation: membersNavigation } = await openAdminNavigation(page);
     await membersNavigation.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+    expect(browserErrors, "Unexpected browser errors during Admin route navigation").toEqual([]);
+  });
+
+  // The previous single 45-second test traversed the entire Admin site and
+  // then attempted maintenance, security rejection, logout and browser-back
+  // checks in the same global timeout. Preserve every native click, check,
+  // security assertion and console check in a separate independent lifecycle.
+  test("maintenance confirmation, server rejection, logout and history protection", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+    await signIn(page);
+    await page.goto("/admin/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
     const maintenanceForm = page.getByRole("form", {
