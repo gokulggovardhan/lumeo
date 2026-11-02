@@ -190,6 +190,9 @@ test("vinext Edit PDF keeps Type3 glyph-program text read-only", async ({
 
   await limitedRun.hover();
   const explanation = page.locator("[data-edit-capability-explanation]");
+  // The CSS hover surface must actually show the explanation, not only
+  // contain correct hidden text. This catches pointer/overlay regressions.
+  await expect(explanation).toBeVisible();
   await expect(explanation).toContainText(/PDF-drawn font/i);
   await expect(explanation).toContainText(/read-only/i);
 
