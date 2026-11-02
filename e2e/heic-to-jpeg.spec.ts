@@ -113,6 +113,11 @@ for (const width of [320, 360, 390, 393, 414, 430]) {
 
 test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", async ({ page }) => {
   await page.goto("/heic-to-jpeg");
+  // A synthetic DragEvent cannot queue against an unhydrated React upload handler.
+  // Use the same existing readiness contract as the native picker test.
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    "data-upload-client-ready", "true", { timeout: 20_000 },
+  );
   await page.locator(".l2-upload-stage").evaluate(async (element) => {
     const canvas = document.createElement("canvas"); canvas.width = 32; canvas.height = 16;
     canvas.getContext("2d")!.fillRect(0,0,32,16);
@@ -123,6 +128,7 @@ test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", a
     element.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
   });
+  await expect(page.getByRole("heading", { name: "2 photos detected" })).toBeVisible();
   await page.getByRole("button", { name: "Convert to JPEG" }).click();
   await expect(page.getByRole("button", { name: "Download all (2)" })).toBeVisible();
   const promise = page.waitForEvent("download");
