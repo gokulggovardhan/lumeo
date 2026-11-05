@@ -1,4 +1,5 @@
 import runtimeRelease from "@/config/office-runtime-release.json";
+import { servePinnedOfficeRuntimeManifest } from "@/worker/office-runtime-manifest";
 
 const ALLOWED_RUNTIME_ASSETS = {
   "soffice.js": "application/javascript",
@@ -60,6 +61,11 @@ async function proxyRuntimeAsset(
   }
 
   const runtimeAsset = asset as RuntimeAssetName;
+
+  // Keep the framework fallback consistent with the direct Worker fast path.
+  if (runtimeAsset === "lumeo-office-runtime.json") {
+    return servePinnedOfficeRuntimeManifest(request);
+  }
   const upstreamHeaders = new Headers();
   const range = request.headers.get("range");
   if (range) upstreamHeaders.set("Range", range);
