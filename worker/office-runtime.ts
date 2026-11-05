@@ -1,4 +1,13 @@
 import runtimeRelease from "../config/office-runtime-release.json" with { type: "json" };
+import pinnedRuntimeManifest from "../config/office-runtime-manifest.json" with { type: "json" };
+
+// Exact immutable manifest shipped as a 1.6KB release artifact. Serving it
+// directly prevents upstream GitHub 504s from failing all Office preflights.
+// The 100MB+ Office payloads remain streamed without buffering.
+if (pinnedRuntimeManifest.releaseId !== runtimeRelease.releaseId) {
+  throw new Error("Pinned Office manifest release ID does not match configured release.");
+}
+const PINNED_OFFICE_MANIFEST_BODY = JSON.stringify(pinnedRuntimeManifest);
 
 const OFFICE_RUNTIME_ROOT = "/office-runtime/";
 
@@ -142,6 +151,23 @@ function runtimeError(status: number, message: string): Response {
   });
 }
 
+function pinnedOfficeManifestResponse(method: string): Response {
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    "Cache-Control": "public, max-age=31536000, immutable, no-transform",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Strict-Transport-Security": "max-age=31536000",
+    "Content-Length": String(new TextEncoder().encode(PINNED_OFFICE_MANIFEST_BODY).byteLength),
+  });
+  return new Response(method === "HEAD" ? null : PINNED_OFFICE_MANIFEST_BODY, {
+    status: 200,
+    headers,
+  });
+}
+
 /**
  * Handles immutable Office runtime assets before vinext.
  *
@@ -165,6 +191,9 @@ export async function maybeHandleOfficeRuntimeRequest(
 
   const asset = runtimeAssetFromPath(url.pathname);
   if (!asset) return runtimeError(404, "Not found");
+  if (asset === "lumeo-office-runtime.json") {
+    return pinnedOfficeManifestResponse(request.method);
+  }
 
   const upstreamHeaders = new Headers({
     "Accept-Encoding": "identity",
