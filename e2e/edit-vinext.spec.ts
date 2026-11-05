@@ -1843,8 +1843,15 @@ test("vinext Edit PDF applies one safe formatting transaction across mixed nativ
     const firstRun = editableRuns.nth(firstIndex);
     const secondRun = editableRuns.nth(secondIndex);
 
-    await firstRun.click();
-    await expect(firstRun).toHaveAttribute("aria-pressed", "true");
+    // WebKit can intercept a click while the PDF preview is settling.
+    // Use the existing accessible keyboard selection path instead.
+    if ((await firstRun.getAttribute("aria-pressed")) !== "true") {
+      await firstRun.focus();
+      await firstRun.press("Enter");
+    }
+    await expect(firstRun).toHaveAttribute("aria-pressed", "true", {
+      timeout: 10_000,
+    });
 
     // WebKit can intermittently drop Playwright's synthetic click modifier
     // while focus moves from the inline editor to the next native run. Drive
