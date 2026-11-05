@@ -1,0 +1,100 @@
+# Read-only preview of the exact Graphify toolchain on proposed changes.
+# Never labels communities, pushes generated files, or opens bot PRs.
+name: Validate Graphify PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "requirements-graphify.txt"
+      - "scripts/graphify_env_check.py"
+      - "scripts/graphify_fingerprint.py"
+      - ".graphifyignore"
+      - "graphify-out/**"
+      - ".github/workflows/graphify-refresh.yml"
+      - ".github/workflows/graphify-pr-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphify-pr-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce-graph:
+    name: Reproduce Graphify extractor and SQL topology (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout candidate without write credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Use the same Python version as graph refresh
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install precisely pinned graph tooling
+        run: python -m pip install -r requirements-graphify.txt
+      - name: Verify extractor version, SQL extra, partitioner and clean input set
+        run: python scripts/graphify_env_check.py
+      - name: Fingerprint committed baseline without changing it
+        run: python scripts/graphify_fingerprint.py graphify-out/graph.json
+      - name: Rebuild graph locally, without LLM labels or any repository write
+        env:
+          GRAPHIFY_VIZ_NODE_LIMIT: "1"
+        run: graphify update . --force
+      - name: Validate generated graph and SQL extractor output
+        run: |
+          python scripts/graphify_fingerprint.py graphify-out/graph.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          graph = json.loads(Path("graphify-out/graph.json").read_text(encoding="utf-8"))
+          nodes, links = graph["nodes"], graph["links"]
+          sql = [
+              node for node in nodes
+              if str(node.get("source_file", "")).lower().endswith(".sql")
+          ]
+          assert nodes and links, "Graphify returned an empty graph or topology"
+          assert sql, "No .sql source nodes; the required SQL extractor may be missing"
+          node_ids = [str(node["id"]) for node in nodes]
+          assert len(node_ids) == len(set(node_ids)), "Duplicate graph node identities"
+          known = set(node_ids)
+          dangling = [
+              (link.get("source"), link.get("target"))
+              for link in links
+              if str(link.get("source")) not in known or str(link.get("target")) not in known
+          ]
+          assert not dangling, f"Dangling graph link endpoints: {dangling[:5]}"
+          assert all(Path(str(node["source_file"])).is_file() for node in sql), (
+              "SQL-source node refers to a missing source file"
+          )
+          print(
+              f"Reproduced read-only topology: {len(nodes)} nodes, "
+              f"{len(links)} links, {len(sql)} SQL-source nodes"
+          )
+          PY
+      - name: Verify repeatable AST topology without requiring deterministic communities
+        env:
+          GRAPHIFY_VIZ_NODE_LIMIT: "1"
+        run: |
+          cp graphify-out/graph.json /tmp/lumeo-graphify-first.json
+          graphify update . --force
+          python - <<'PY'
+          from scripts.graphify_fingerprint import fingerprint
+          first = fingerprint("/tmp/lumeo-graphify-first.json")
+          second = fingerprint("graphify-out/graph.json")
+          assert first["topology"] == second["topology"], (
+              f"Topology changed between identical inputs: {first['topology']} vs {second['topology']}"
+          )
+          assert first["nodes"] == second["nodes"] and first["links"] == second["links"]
+          print(f"PASS repeated graphify topology: {second['topology']}")
+          PY
+      - name: Report uncommitted generated differences for reviewer
+        run: |
+          git status --short -- graphify-out/
+          git diff --stat -- graphify-out/
