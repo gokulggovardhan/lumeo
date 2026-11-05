@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "zeta-24-2-2026-09-21-a",
+  "zetaJsVersion": "1.2.0",
+  "zetaOfficeBranch": "distro/allotropia/zeta-24-2",
+  "createdAt": "2026-09-21T05:00:56.488Z",
+  "sourceBaseUrl": "https://cdn.zetaoffice.net/zetaoffice_latest/",
+  "files": {
+    "soffice.js": {
+      "bytes": 858124,
+      "sha256": "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77",
+      "contentType": "application/javascript",
+      "sourceContentType": "application/javascript",
+      "sourceEtag": "\"682362af-d180c\"",
+      "sourceLastModified": "Tue, 13 May 2025 15:18:07 GMT"
+    },
+    "soffice.wasm": {
+      "bytes": 161667499,
+      "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4",
+      "contentType": "application/wasm",
+      "sourceContentType": "application/wasm",
+      "sourceEtag": "\"682362b6-22993d2\"",
+      "sourceLastModified": "Tue, 13 May 2025 15:18:14 GMT"
+    },
+    "soffice.data": {
+      "bytes": 99520604,
+      "sha256": "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c",
+      "contentType": "application/octet-stream",
+      "sourceContentType": "application/octet-stream",
+      "sourceEtag": "\"682362b3-f27a45\"",
+      "sourceLastModified": "Tue, 13 May 2025 15:18:11 GMT"
+    },
+    "soffice.data.js.metadata": {
+      "bytes": 215180,
+      "sha256": "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3",
+      "contentType": "application/json",
+      "sourceContentType": "application/octet-stream",
+      "sourceEtag": "\"682362ae-3488c\"",
+      "sourceLastModified": "Tue, 13 May 2025 15:18:06 GMT"
+    }
+  }
+}
