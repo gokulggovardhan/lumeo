@@ -101,10 +101,8 @@ function TextRunOverlayImpl({
       : editable
         ? "border border-transparent bg-[var(--lumeo-gold)]/[0.025]"
         : "border border-transparent";
-  const showLimitation =
-    !editable &&
-    limitationMessage !== null &&
-    (hovered || focused || selected);
+  const hasLimitation = !editable && limitationMessage !== null;
+  const showLimitation = hasLimitation && (hovered || focused || selected);
   const limitationVerticalClass =
     run.yPct < 18 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]";
   const limitationHorizontalClass = run.xPct > 70 ? "right-0" : "left-0";
@@ -115,7 +113,7 @@ function TextRunOverlayImpl({
       role="button"
       tabIndex={0}
       aria-label={`${editable ? "Editable" : "Not yet editable"} text: ${run.str}`}
-      aria-describedby={showLimitation ? limitationId : undefined}
+      aria-describedby={hasLimitation ? limitationId : undefined}
       aria-pressed={selected}
       title={!editable && limitationMessage ? limitationMessage.title : undefined}
       onClick={handleClick}
@@ -124,7 +122,7 @@ function TextRunOverlayImpl({
       onMouseLeave={onHoverEnd}
       onFocus={onFocusRun}
       onBlur={onBlurRun}
-      className={`absolute z-10 rounded-[2px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${borderClass} ${editable ? "cursor-text" : "cursor-not-allowed"}`}
+      className={`group absolute z-10 rounded-[2px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${borderClass} ${editable ? "cursor-text" : "cursor-not-allowed"}`}
       style={{
         left: `${run.xPct}%`,
         top: `${run.yPct}%`,
@@ -132,12 +130,12 @@ function TextRunOverlayImpl({
         height: `${run.heightPct}%`,
       }}
     >
-      {showLimitation && limitationMessage ? (
+      {hasLimitation && limitationMessage ? (
         <span
           id={limitationId}
           role="status"
           data-edit-capability-explanation
-          className={`pointer-events-none absolute z-40 w-max max-w-[240px] rounded-lg border border-black/10 bg-white/96 px-2.5 py-2 text-left text-[10px] leading-4 text-[#343842] shadow-lg ${limitationVerticalClass} ${limitationHorizontalClass}`}
+          className={`pointer-events-none invisible group-hover:visible group-focus:visible ${showLimitation ? "visible" : ""} absolute z-40 w-max max-w-[240px] rounded-lg border border-black/10 bg-white/96 px-2.5 py-2 text-left text-[10px] leading-4 text-[#343842] shadow-lg ${limitationVerticalClass} ${limitationHorizontalClass}`}
         >
           <strong className="block font-bold">{limitationMessage.title}</strong>
           <span className="mt-0.5 block font-medium text-[#5d6470]">
