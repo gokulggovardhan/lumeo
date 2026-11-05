@@ -302,7 +302,9 @@ jobs:
 
   migrate:
     name: Apply Supabase migrations
-    needs: validate
+    # Never change the production database while the independent Admin
+    # browser regression job is still running or has failed.
+    needs: [validate, admin-browser-e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
