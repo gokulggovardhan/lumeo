@@ -98,3 +98,14 @@ jobs:
         run: |
           git status --short -- graphify-out/
           git diff --stat -- graphify-out/
+
+      - name: Preserve reproducible Graphify output for review
+        uses: actions/upload-artifact@v7
+        with:
+          name: graphify-reproduced-candidate
+          path: |
+            graphify-out/graph.json
+            graphify-out/manifest.json
+            graphify-out/GRAPH_REPORT.md
+          if-no-files-found: error
+          retention-days: 7
