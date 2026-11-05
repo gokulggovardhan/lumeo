@@ -1,4 +1,5 @@
 import runtimeRelease from "../config/office-runtime-release.json" with { type: "json" };
+import { servePinnedOfficeRuntimeManifest } from "./office-runtime-manifest";
 
 const OFFICE_RUNTIME_ROOT = "/office-runtime/";
 
@@ -165,6 +166,12 @@ export async function maybeHandleOfficeRuntimeRequest(
 
   const asset = runtimeAssetFromPath(url.pathname);
   if (!asset) return runtimeError(404, "Not found");
+
+  // The published 1.6 KB manifest is pinned in this Worker bundle, so this
+  // metadata fetch cannot fail with an intermittent upstream 504.
+  if (asset === "lumeo-office-runtime.json") {
+    return servePinnedOfficeRuntimeManifest(request);
+  }
 
   const upstreamHeaders = new Headers({
     "Accept-Encoding": "identity",
