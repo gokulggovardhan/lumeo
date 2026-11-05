@@ -69,6 +69,9 @@ test("only pinned, nonfatal Emscripten progress is excluded from production cons
   for (const message of [
     "still waiting on run dependencies:",
     "dependency: wasm-instantiate",
+    "QRect(0,0 0x0) 1",
+    "QObject::connect(QWindow, QtFrame): invalid nullptr parameter",
+    "warning: unsupported syscall: __syscall_mprotect",
     "dependency: fp /instdir/program/services.rdb",
     "dependency: datafile_/mnt/builddir/workdir/CustomTarget/static/emscripten_fs_image/soffice.data",
     "(end of list)",
