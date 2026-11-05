@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -8,6 +9,7 @@ import {
   resolveLumeoOfficeAssetBaseUrl,
 } from "../lib/conversion/browser/libreoffice/assetConfig.ts";
 import { maybeHandleOfficeRuntimeRequest } from "../worker/office-runtime.ts";
+import { isPinnedOfficeDependencyProgress } from "../e2e/office-runtime-console.ts";
 
 test("production Office runtime release is immutable and matches the client route", () => {
   assert.equal(LUMEO_OFFICE_RUNTIME_RELEASE_ID, runtimeRelease.releaseId);
@@ -16,6 +18,78 @@ test("production Office runtime release is immutable and matches the client rout
   assert.equal(
     resolveLumeoOfficeAssetBaseUrl("https://lumeo.in"),
     `https://lumeo.in/office-runtime/${runtimeRelease.releaseId}/`,
+  );
+});
+
+
+test("pinned-release manifest is byte-identical to verified GitHub Release metadata", async () => {
+  const body = await readFile("config/office-runtime-manifest.json");
+  assert.equal(body.byteLength, 1633);
+  // SHA-256 from published GitHub Release asset id 578281296, independently
+  // recovered from a successful real Chromium response trace.
+  assert.equal(
+    createHash("sha256").update(body).digest("hex"),
+    "df987a76ae6611dda92b76748f66661cba27cdea3ec6d6670ffed9c2f07f1fd8",
+  );
+  const manifest = JSON.parse(body.toString("utf8"));
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.releaseId, runtimeRelease.releaseId);
+  assert.equal(manifest.zetaJsVersion, "1.2.0");
+
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async (): Promise<Response> => {
+    calls += 1;
+    throw new Error("The pinned manifest must not call GitHub at runtime.");
+  }) as typeof fetch;
+
+  const url = `https://lumeo.in/office-runtime/${runtimeRelease.releaseId}/lumeo-office-runtime.json`;
+  try {
+    const response = await maybeHandleOfficeRuntimeRequest(new Request(url));
+    assert.ok(response);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Content-Type"), "application/json");
+    assert.match(response.headers.get("Cache-Control") ?? "", /immutable/);
+    assert.equal(response.headers.get("Cross-Origin-Resource-Policy"), "same-origin");
+    assert.deepEqual(await response.json(), manifest);
+
+    const head = await maybeHandleOfficeRuntimeRequest(new Request(url, { method: "HEAD" }));
+    assert.ok(head);
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get("Content-Length"), String(Buffer.byteLength(JSON.stringify(manifest))));
+    assert.equal(await head.text(), "");
+    assert.equal(calls, 0, "Neither HEAD nor GET should access an upstream server");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("only pinned, nonfatal Emscripten progress is excluded from production console failures", () => {
+  const pinned = `https://lumeo.in/office-runtime/${runtimeRelease.releaseId}/soffice.js`;
+  for (const message of [
+    "still waiting on run dependencies:",
+    "dependency: wasm-instantiate",
+    "dependency: fp /instdir/program/services.rdb",
+    "dependency: datafile_/mnt/builddir/workdir/CustomTarget/static/emscripten_fs_image/soffice.data",
+    "(end of list)",
+  ]) {
+    assert.equal(isPinnedOfficeDependencyProgress(pinned, message), true, message);
+  }
+  for (const message of [
+    "The local Office engine stopped unexpectedly.",
+    "RuntimeError: unreachable",
+    "dependency: unexpectedFailure",
+    "dependency: fp /instdir/program/services.rdb\\nFatal error",
+  ]) {
+    assert.equal(isPinnedOfficeDependencyProgress(pinned, message), false, message);
+  }
+  assert.equal(
+    isPinnedOfficeDependencyProgress("https://attacker.example/soffice.js", "dependency: wasm-instantiate"),
+    false,
+  );
+  assert.equal(
+    isPinnedOfficeDependencyProgress("https://lumeo.in/office-runtime/outdated/soffice.js", "dependency: wasm-instantiate"),
+    false,
   );
 });
 
