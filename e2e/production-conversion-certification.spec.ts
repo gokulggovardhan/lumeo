@@ -12,6 +12,7 @@ import {
   makeWhitespaceStatementPdf,
 } from "./semantic-pdf-fixtures";
 import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+import { isPinnedOfficeDependencyProgress } from "./office-runtime-console";
 
 test.beforeEach(async ({ context }) => {
   await installOwnedAnalyticsMarker(context);
@@ -67,6 +68,10 @@ function watchConversionRuntime(page: Page): RuntimeWatch {
 
     const text = message.text();
     const locationUrl = message.location().url;
+    // Emscripten reports normal dependency-loading progress on the error
+    // console channel. Only ignore exact messages from our pinned Office JS.
+    // Real exceptions, generic console errors and HTTP failures stay fatal.
+    if (isPinnedOfficeDependencyProgress(locationUrl, text)) return;
     if (
       text === "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
       locationUrl
