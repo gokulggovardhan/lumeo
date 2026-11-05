@@ -329,6 +329,21 @@ test.describe("Control Center authentication", () => {
     // race the confirmation click against that client transition.
     await expect(maintenanceSaveAfterCancel).toHaveAttribute("data-client-ready", "true");
     await expect(maintenanceSaveAfterCancel).toBeEnabled();
+    // Keep the real mobile checkbox clear of the sticky Admin header.
+    // This verifies pointer hit testing instead of forcing interaction.
+    await maintenanceAfterCancel.evaluate((input: HTMLInputElement) => {
+      input.scrollIntoView({ block: "center", inline: "nearest" });
+    });
+    await expect.poll(async () =>
+      maintenanceAfterCancel.evaluate((input: HTMLInputElement) => {
+        const rect = input.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
+        const hit = document.elementFromPoint(x, y);
+        return hit === input || (hit !== null && input.contains(hit));
+      }),
+    ).toBe(true);
     await maintenanceAfterCancel.check();
     await expect(maintenanceAfterCancel).toBeChecked();
     // The first normal click above already verifies pointer confirmation.
