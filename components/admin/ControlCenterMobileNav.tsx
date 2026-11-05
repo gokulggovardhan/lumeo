@@ -27,6 +27,16 @@ export function ControlCenterMobileNav({
   const wrapperRef = useRef<HTMLElement>(null);
   const groups = groupedAdminNavigation(role);
 
+  // The server-rendered Menu button is visible before its React click
+  // handler hydrates. Expose actual client readiness for real pointer tests.
+  // This avoids losing the first mobile tap on a still-unhydrated route.
+  useEffect(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    button.dataset.clientReady = "true";
+    return () => { delete button.dataset.clientReady; };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
 
@@ -53,7 +63,7 @@ export function ControlCenterMobileNav({
   }, [open]);
 
   return (
-    <header ref={wrapperRef} className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
+    <header data-lumeo-admin-mobile-nav ref={wrapperRef} className="sticky top-0 z-40 border-b border-[var(--border-hairline)] bg-[rgba(17,19,16,0.9)] backdrop-blur-xl lg:hidden">
       <div className="flex min-h-16 items-center justify-between gap-3 px-4">
         <a
           href="/admin"
@@ -63,7 +73,7 @@ export function ControlCenterMobileNav({
           <BrandLockup markSize="h-8 w-8" />
         </a>
 
-        <div className="min-w-0 flex-1 text-center">
+        <div className="hidden min-w-0 flex-1 text-center sm:block">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             {environment === "production" ? "Production" : environment} · Cloudflare · IST
           </p>
@@ -79,7 +89,7 @@ export function ControlCenterMobileNav({
           aria-expanded={open}
           aria-controls="admin-mobile-menu"
           onClick={() => setOpen((value) => !value)}
-          className="min-h-10 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
+          className="relative z-10 min-h-10 shrink-0 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.04)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-premium)]"
         >
           {open ? "Close" : "Menu"}
         </button>

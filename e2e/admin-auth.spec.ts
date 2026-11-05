@@ -20,10 +20,10 @@ function collectUnexpectedBrowserErrors(page: Page) {
     const message = error.message;
     // WebKit can surface an aborted localhost RSC navigation as a page error
     // even after the target Admin page has rendered successfully. Ignore only
-    // this exact local /admin/health RSC cancellation; auth/API/page failures
+    // this exact local /admin/health RSC cancellation on Next dev (3000) or\n    // isolated Cloudflare Worker preview (8787); auth/API/page failures
     // and all production-origin errors remain fatal.
     if (
-      /^\/127\.0\.0\.1:3000\/admin\/health\?_rsc=[A-Za-z0-9_-]+ due to access control checks\.$/.test(
+      /^\/127\.0\.0\.1:(?:3000|8787)\/admin\/health\?_rsc=[A-Za-z0-9_-]+ due to access control checks\.$/.test(
         message,
       )
     ) {
@@ -62,6 +62,7 @@ async function openAdminNavigation(page: Page) {
   });
 
   if (await openButton.isVisible().catch(() => false)) {
+    await expect(openButton).toHaveAttribute("data-client-ready", "true");
     await expect(openButton).toHaveAttribute("aria-expanded", "false");
     await openButton.click();
 
@@ -94,6 +95,7 @@ async function exerciseResponsiveNavigation(page: Page) {
     name: "Open Admin navigation",
   });
   await expect(reopenedButton).toBeVisible();
+  await expect(reopenedButton).toHaveAttribute("data-client-ready", "true");
   await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
   await expect(reopenedButton).toBeFocused();
 }
@@ -118,12 +120,14 @@ test.describe("Control Center authentication", () => {
     expect(overflow).toBe(false);
   });
 
-  test("login, persistence, navigation, realtime, logout, back protection and re-login", async ({ page }) => {
+  // Independent authenticated journeys preserve every route and security
+  // assertion without giving a slow iPhone WebKit full-site traversal one
+  // global 45-second deadline. None of these tests skip browser errors.
+  test("login, session persistence and responsive Analytics navigation", async ({ page }) => {
     expect(
       hasAdminCredentials,
       "Disposable local admin credentials are required for the authenticated lifecycle test.",
     ).toBe(true);
-
     const browserErrors = collectUnexpectedBrowserErrors(page);
 
     await signIn(page);
@@ -168,6 +172,19 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
+  });
+
+  test("Analytics to Inbox, Errors and Health navigation with private reload", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+
+    await signIn(page);
+    await page.goto("/admin/analytics?range=30d");
+    await expect(page.getByRole("heading", { name: "Verified traffic analytics", exact: true })).toBeVisible();
     const { navigation: analyticsNavigation } = await openAdminNavigation(page);
     await analyticsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
@@ -216,6 +233,19 @@ test.describe("Control Center authentication", () => {
       healthMain.getByText("LibreOffice converter", { exact: true }),
     ).toHaveCount(0);
 
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
+  });
+
+  test("Health to Audit, Administrators and Settings responsive navigation", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+
+    await signIn(page);
+    await page.goto("/admin/health");
+    await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     const { navigation: healthNavigation } = await openAdminNavigation(page);
     await healthNavigation.getByRole("link", { name: "Audit Log" }).click();
     await expect(page).toHaveURL(/\/admin\/audit/);
@@ -243,6 +273,23 @@ test.describe("Control Center authentication", () => {
     const { navigation: membersNavigation } = await openAdminNavigation(page);
     await membersNavigation.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
+  });
+
+  // The previous single 45-second test traversed the entire Admin site and
+  // then attempted maintenance, security rejection, logout and browser-back
+  // checks in the same global timeout. Preserve every native click, check,
+  // security assertion and console check in a separate independent lifecycle.
+  test("maintenance confirmation, server rejection, logout and history protection", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+    await signIn(page);
+    await page.goto("/admin/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
     const maintenanceForm = page.getByRole("form", {
@@ -312,6 +359,21 @@ test.describe("Control Center authentication", () => {
     // race the confirmation click against that client transition.
     await expect(maintenanceSaveAfterCancel).toHaveAttribute("data-client-ready", "true");
     await expect(maintenanceSaveAfterCancel).toBeEnabled();
+    // Keep the real mobile checkbox clear of the sticky Admin header.
+    // This verifies pointer hit testing instead of forcing interaction.
+    await maintenanceAfterCancel.evaluate((input: HTMLInputElement) => {
+      input.scrollIntoView({ block: "center", inline: "nearest" });
+    });
+    await expect.poll(async () =>
+      maintenanceAfterCancel.evaluate((input: HTMLInputElement) => {
+        const rect = input.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
+        const hit = document.elementFromPoint(x, y);
+        return hit === input || (hit !== null && input.contains(hit));
+      }),
+    ).toBe(true);
     await maintenanceAfterCancel.check();
     await expect(maintenanceAfterCancel).toBeChecked();
     // The first normal click above already verifies pointer confirmation.

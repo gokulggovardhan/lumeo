@@ -89,3 +89,70 @@ test("HTML to PDF produces multi-page output and supports repeat generation", as
   await page.getByLabel("Page size").selectOption("letter");
   await expect(fallback).toBeHidden(); // Page layout changes invalidate the PDF too.
 });
+
+
+test("HTML to PDF strips executable markup in its same-origin Shadow DOM and preserves valid output", async ({ page }) => {
+  await page.goto("/pdf/html-to-pdf", { waitUntil: "domcontentloaded" });
+
+  // The export surface is short-lived. Observe its own Shadow DOM, not a mock
+  // sanitizer, while the real browser-only PDF generator is running.
+  await page.evaluate(() => {
+    type SecurityProbe = Window & {
+      __lumeoHtmlSecurityExecuted?: boolean;
+      __lumeoHtmlSecurityObserved?: string;
+    };
+    const probe = window as SecurityProbe;
+    probe.__lumeoHtmlSecurityExecuted = false;
+    const monitor = new MutationObserver(() => {
+      const exportHost = [...document.querySelectorAll<HTMLElement>("div[aria-hidden='true']")]
+        .find((candidate) => candidate.style.left === "-10000px" && candidate.shadowRoot);
+      if (!exportHost?.shadowRoot) return;
+      probe.__lumeoHtmlSecurityObserved = exportHost.shadowRoot.innerHTML;
+      monitor.disconnect();
+    });
+    monitor.observe(document.body, { childList: true, subtree: true });
+  });
+
+  // These are deliberately harmless synthetic payloads: if executable markup
+  // escapes sanitization it only toggles a test-window boolean in local CI.
+  const html = [
+    "<!doctype html><html><head>",
+    "<style>.safe-report { color: #123456; font-weight: bold; }</style>",
+    "</head><body><h1 class='safe-report'>Safe report survives</h1>",
+    "<script>window.__lumeoHtmlSecurityExecuted=true</script>",
+    "<img alt='invalid image' src='data:image/png;base64,broken'",
+    " onerror='window.__lumeoHtmlSecurityExecuted=true'>",
+    "<a href='javascript:window.__lumeoHtmlSecurityExecuted=true'>Safe link text</a>",
+    "<svg onload='window.__lumeoHtmlSecurityExecuted=true'><circle r='1'/></svg>",
+    "<p>Readable text and CSS remain.</p></body></html>",
+  ].join("");
+
+  await replaceControlledText(page, "HTML and CSS source", html);
+  const generate = page.locator("button.lumeo-primary-action").first();
+  const downloadPromise = page.waitForEvent("download");
+  await generate.click();
+  const download = await downloadPromise;
+
+  const { executed, observed } = await page.evaluate(() => {
+    const probe = window as Window & {
+      __lumeoHtmlSecurityExecuted?: boolean;
+      __lumeoHtmlSecurityObserved?: string;
+    };
+    return {
+      executed: probe.__lumeoHtmlSecurityExecuted,
+      observed: probe.__lumeoHtmlSecurityObserved ?? null,
+    };
+  });
+
+  expect(executed).toBe(false);
+  expect(observed).not.toBeNull();
+  const sanitized = observed ?? "";
+  expect(sanitized).toContain("Safe report survives");
+  expect(sanitized).toContain(".safe-report");
+  expect(sanitized).not.toMatch(/<script\b|onerror\s*=|onload\s*=|href\s*=\s*["']javascript:/i);
+
+  const bytes = await downloadBytes(download);
+  const pdf = await PDFDocument.load(bytes);
+  expect(pdf.getPageCount()).toBeGreaterThanOrEqual(1);
+  expect(bytes.length).toBeGreaterThan(1_000);
+});

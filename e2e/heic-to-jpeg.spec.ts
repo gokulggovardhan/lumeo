@@ -73,7 +73,10 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   });
   const uploads: string[] = [];
   page.on("request", (request) => { if (request.method() === "POST") uploads.push(request.url()); });
-  await page.locator('input[type="file"]').setInputFiles([
+  const photoInput = page.locator('input[type="file"]');
+  // Await the actual client handler before simulating a native WebKit file selection.
+  await expect(photoInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await photoInput.setInputFiles([
     { name: "CURRENT.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
     // Add the Live Photo companion separately: WebKit may discard the entire\n    // mixed file-input selection when a video is supplied alongside images.\n    // The picker should receive image files only; companion handling is tested\n    // through the drag-and-drop import path.\n
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
@@ -110,6 +113,11 @@ for (const width of [320, 360, 390, 393, 414, 430]) {
 
 test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", async ({ page }) => {
   await page.goto("/heic-to-jpeg");
+  // A synthetic DragEvent cannot queue against an unhydrated React upload handler.
+  // Use the same existing readiness contract as the native picker test.
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    "data-upload-client-ready", "true", { timeout: 20_000 },
+  );
   await page.locator(".l2-upload-stage").evaluate(async (element) => {
     const canvas = document.createElement("canvas"); canvas.width = 32; canvas.height = 16;
     canvas.getContext("2d")!.fillRect(0,0,32,16);
@@ -120,6 +128,7 @@ test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", a
     element.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
     element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
   });
+  await expect(page.getByRole("heading", { name: "2 photos detected" })).toBeVisible();
   await page.getByRole("button", { name: "Convert to JPEG" }).click();
   await expect(page.getByRole("button", { name: "Download all (2)" })).toBeVisible();
   const promise = page.waitForEvent("download");
@@ -164,6 +173,7 @@ test("batch controls remove a selected file and convert-more resets cleanly", as
     return canvas.toDataURL("image/jpeg").split(",")[1];
   });
   const input = page.locator('input[type="file"]');
+  await expect(input).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
   await input.setInputFiles([
     { name: "keep.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
     { name: "remove.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") },
@@ -203,7 +213,9 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
     const qualityPage = await page.context().newPage();
     try {
     await qualityPage.goto("/heic-to-jpeg");
-    await qualityPage.locator('input[type="file"]').setInputFiles(fixture!);
+    const qualityInput = qualityPage.locator('input[type="file"]');
+    await expect(qualityInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+    await qualityInput.setInputFiles(fixture!);
     await expect(qualityPage.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
     await qualityPage.getByLabel("Quality").selectOption(quality);
     await qualityPage.getByRole("button", { name: "Convert to JPEG" }).click();
@@ -243,7 +255,9 @@ test("full-resolution batch isolates corruption and ZIP keeps full JPEG dimensio
 
   const heic = await readFile(fixture!);
   await page.goto("/heic-to-jpeg");
-  await page.locator('input[type="file"]').setInputFiles([
+  const batchInput = page.locator('input[type="file"]');
+  await expect(batchInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await batchInput.setInputFiles([
     { name: "FULL_A.HEIC", mimeType: "image/heic", buffer: heic },
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
     { name: "FULL_B.HEIC", mimeType: "image/heic", buffer: heic },
@@ -282,7 +296,9 @@ test("malicious HEIF structures fail per-file before poisoning the next valid co
   const { itemFlood, auxCycle, longReferenceChain } = maliciousHeifFixtures();
 
   await page.goto("/heic-to-jpeg");
-  await page.locator('input[type="file"]').setInputFiles([
+  const securityInput = page.locator('input[type="file"]');
+  await expect(securityInput).toHaveAttribute("data-upload-client-ready", "true", { timeout: 20_000 });
+  await securityInput.setInputFiles([
     { name: "ITEM-FLOOD.HEIC", mimeType: "image/heic", buffer: itemFlood },
     { name: "AUX-CYCLE.HEIC", mimeType: "image/heic", buffer: auxCycle },
     { name: "LONG-IREF-CHAIN.HEIC", mimeType: "image/heic", buffer: longReferenceChain },

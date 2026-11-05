@@ -785,6 +785,15 @@ test.describe("browser conversion validation lab", () => {
       )
       .toBe(true);
 
+    // The isolation reload has completed, but server HTML can precede React
+    // hydration. Select the actual DOCX only once the mounted upload handler
+    // confirms readiness; keep real Office conversion and PDF byte checks.
+    await expect(page.locator("[data-word-to-pdf-client-ready]")).toHaveAttribute(
+      "data-word-to-pdf-client-ready",
+      "true",
+      { timeout: 30_000 },
+    );
+
     const docx = await makeDocx({ rich: true });
     await page.locator('input[type="file"]').setInputFiles({
       name: "client-navigation-roundtrip.docx",

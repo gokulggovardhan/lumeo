@@ -146,9 +146,9 @@ try {
   }
 
   assert(packageJson.scripts["verify:aura"] === "node scripts/verify-lumeo-aura.mjs", "verify:aura script is missing.");
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.4.5", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
+  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.118.0", "Supabase JS version changed unexpectedly.");
 
   const newSource = [ui, workspace, read("components/layout/AuraPublicShell.tsx")].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(newSource), "Production debug logging must not be added.");
