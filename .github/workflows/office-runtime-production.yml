@@ -267,7 +267,12 @@ jobs:
             expected_size="$(node -p "require('$manifest_file').files['$file'].bytes")"
             expected_sha="$(node -p "require('$manifest_file').files['$file'].sha256")"
 
+            # GitHub release delivery can return a transient HTTP 429 at
+            # the Cloudflare edge. Retry the *same immutable URL* with bounded
+            # delays, and still reject anything that fails the byte-count,
+            # content headers, response status or SHA-256 checks below.
             curl --fail --silent --show-error --location --max-time 600 \
+              --retry 4 --retry-all-errors --retry-delay 20 --retry-max-time 1200 \
               -H 'Accept-Encoding: identity' \
               --dump-header "$headers" \
               --output "$output" \
