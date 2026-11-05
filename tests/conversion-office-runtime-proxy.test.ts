@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import runtimeRelease from "../config/office-runtime-release.json" with { type: "json" };
+import pinnedRuntimeManifest from "../config/office-runtime-manifest.json" with { type: "json" };
 import {
   LUMEO_OFFICE_RUNTIME_RELEASE_ID,
   resolveLumeoOfficeAssetBaseUrl,
@@ -32,6 +34,56 @@ test("Cloudflare Worker intercepts Office runtime before vinext", async () => {
     directRuntimeIndex < vinextIndex,
     "Office runtime must be handled before vinext",
   );
+});
+
+test("Pinned Office manifest matches the published immutable release byte-for-byte", async () => {
+  const source = await readFile("config/office-runtime-manifest.json");
+  assert.equal(source.length, 1633);
+  assert.equal(
+    createHash("sha256").update(source).digest("hex"),
+    "df987a76ae6611dda92b76748f66661cba27cdea3ec6d6670ffed9c2f07f1fd8",
+  );
+  assert.equal(pinnedRuntimeManifest.releaseId, runtimeRelease.releaseId);
+  assert.equal(pinnedRuntimeManifest.files["soffice.wasm"].bytes, 161667499);
+  assert.equal(pinnedRuntimeManifest.files["soffice.data"].bytes, 99520604);
+});
+
+test("Office manifest is served locally without contacting GitHub for GET or HEAD", async () => {
+  const originalFetch = globalThis.fetch;
+  let networkCalls = 0;
+  globalThis.fetch = (async (): Promise<Response> => {
+    networkCalls += 1;
+    throw new Error("Published manifest must not issue an upstream subrequest.");
+  }) as typeof fetch;
+
+  const url = `https://lumeo.in/office-runtime/${runtimeRelease.releaseId}/lumeo-office-runtime.json`;
+  try {
+    const getResponse = await maybeHandleOfficeRuntimeRequest(new Request(url));
+    assert.ok(getResponse);
+    assert.equal(getResponse.status, 200);
+    assert.equal(getResponse.headers.get("Content-Type"), "application/json");
+    assert.match(getResponse.headers.get("Cache-Control") ?? "", /immutable/);
+    assert.match(getResponse.headers.get("Cache-Control") ?? "", /no-transform/);
+    assert.equal(getResponse.headers.get("Cross-Origin-Resource-Policy"), "same-origin");
+    assert.equal(getResponse.headers.get("X-Content-Type-Options"), "nosniff");
+    const body = await getResponse.text();
+    assert.deepEqual(JSON.parse(body), pinnedRuntimeManifest);
+    assert.equal(
+      Number(getResponse.headers.get("Content-Length")),
+      Buffer.byteLength(body),
+    );
+
+    const headResponse = await maybeHandleOfficeRuntimeRequest(
+      new Request(url, { method: "HEAD" }),
+    );
+    assert.ok(headResponse);
+    assert.equal(headResponse.status, 200);
+    assert.equal(headResponse.headers.get("Content-Length"), getResponse.headers.get("Content-Length"));
+    assert.equal(await headResponse.text(), "");
+    assert.equal(networkCalls, 0, "Manifest requests must never reach GitHub");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("Office runtime fast path streams identity bytes and preserves Range", async () => {

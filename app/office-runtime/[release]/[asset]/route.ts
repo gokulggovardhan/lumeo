@@ -1,4 +1,10 @@
 import runtimeRelease from "@/config/office-runtime-release.json";
+import pinnedRuntimeManifest from "@/config/office-runtime-manifest.json";
+
+if (pinnedRuntimeManifest.releaseId !== runtimeRelease.releaseId) {
+  throw new Error("Pinned Office manifest release ID does not match configured release.");
+}
+const PINNED_MANIFEST_BODY = JSON.stringify(pinnedRuntimeManifest);
 
 const ALLOWED_RUNTIME_ASSETS = {
   "soffice.js": "application/javascript",
@@ -60,6 +66,21 @@ async function proxyRuntimeAsset(
   }
 
   const runtimeAsset = asset as RuntimeAssetName;
+  if (runtimeAsset === "lumeo-office-runtime.json") {
+    return new Response(
+      request.method === "HEAD" ? null : PINNED_MANIFEST_BODY,
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=31536000, immutable, no-transform",
+          "Cross-Origin-Resource-Policy": "same-origin",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Length": String(new TextEncoder().encode(PINNED_MANIFEST_BODY).byteLength),
+        },
+      },
+    );
+  }
   const upstreamHeaders = new Headers();
   const range = request.headers.get("range");
   if (range) upstreamHeaders.set("Range", range);

@@ -163,6 +163,24 @@ function isExpectedOfficeRuntimeDiagnostic(
   browserName?: string,
 ): boolean {
   const normalized = message.trim();
+  // The pinned Office WASM build may print Emscripten run-dependency progress
+  // to console.error even when the subsequent real DOCX conversions succeeded
+  // and the downloaded PDF bytes were independently validated. Ignore only
+  // these exact progress markers in callers that explicitly opt into known
+  // Office diagnostics; exceptions, asset HTTP errors, and failed PDF exports
+  // remain fatal, and generic console errors are never suppressed.
+  if (
+    (browserName === "chromium" || browserName === "firefox") &&
+    (
+      normalized === "still waiting on run dependencies:" ||
+      normalized === "(end of list)" ||
+      normalized === "dependency: wasm-instantiate" ||
+      normalized.startsWith("dependency: fp /android/") ||
+      normalized.startsWith("dependency: fp /instdir/")
+    )
+  ) {
+    return true;
+  }
   if (
     (browserName === "chromium" || browserName === "firefox") &&
     (normalized === "QRect(0,0 0x0) 1" ||
