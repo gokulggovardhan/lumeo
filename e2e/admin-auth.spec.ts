@@ -62,6 +62,7 @@ async function openAdminNavigation(page: Page) {
   });
 
   if (await openButton.isVisible().catch(() => false)) {
+    await expect(openButton).toHaveAttribute("data-client-ready", "true");
     await expect(openButton).toHaveAttribute("aria-expanded", "false");
     await openButton.click();
 
@@ -94,6 +95,7 @@ async function exerciseResponsiveNavigation(page: Page) {
     name: "Open Admin navigation",
   });
   await expect(reopenedButton).toBeVisible();
+  await expect(reopenedButton).toHaveAttribute("data-client-ready", "true");
   await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
   await expect(reopenedButton).toBeFocused();
 }
@@ -118,12 +120,14 @@ test.describe("Control Center authentication", () => {
     expect(overflow).toBe(false);
   });
 
-  test("login, session persistence and full responsive Admin route navigation", async ({ page }) => {
+  // Independent authenticated journeys preserve every route and security
+  // assertion without giving a slow iPhone WebKit full-site traversal one
+  // global 45-second deadline. None of these tests skip browser errors.
+  test("login, session persistence and responsive Analytics navigation", async ({ page }) => {
     expect(
       hasAdminCredentials,
       "Disposable local admin credentials are required for the authenticated lifecycle test.",
     ).toBe(true);
-
     const browserErrors = collectUnexpectedBrowserErrors(page);
 
     await signIn(page);
@@ -168,6 +172,19 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
+  });
+
+  test("Analytics to Inbox, Errors and Health navigation with private reload", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+
+    await signIn(page);
+    await page.goto("/admin/analytics?range=30d");
+    await expect(page.getByRole("heading", { name: "Verified traffic analytics", exact: true })).toBeVisible();
     const { navigation: analyticsNavigation } = await openAdminNavigation(page);
     await analyticsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
@@ -216,6 +233,19 @@ test.describe("Control Center authentication", () => {
       healthMain.getByText("LibreOffice converter", { exact: true }),
     ).toHaveCount(0);
 
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
+  });
+
+  test("Health to Audit, Administrators and Settings responsive navigation", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+    const browserErrors = collectUnexpectedBrowserErrors(page);
+
+    await signIn(page);
+    await page.goto("/admin/health");
+    await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     const { navigation: healthNavigation } = await openAdminNavigation(page);
     await healthNavigation.getByRole("link", { name: "Audit Log" }).click();
     await expect(page).toHaveURL(/\/admin\/audit/);
@@ -245,7 +275,7 @@ test.describe("Control Center authentication", () => {
     await expect(page).toHaveURL(/\/admin\/settings/);
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
-    expect(browserErrors, "Unexpected browser errors during Admin route navigation").toEqual([]);
+    expect(browserErrors, "Unexpected browser errors during Admin navigation").toEqual([]);
   });
 
   // The previous single 45-second test traversed the entire Admin site and
