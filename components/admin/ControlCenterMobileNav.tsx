@@ -27,6 +27,16 @@ export function ControlCenterMobileNav({
   const wrapperRef = useRef<HTMLElement>(null);
   const groups = groupedAdminNavigation(role);
 
+  // The server-rendered Menu button is visible before its React click
+  // handler hydrates. Expose actual client readiness for real pointer tests.
+  // This avoids losing the first mobile tap on a still-unhydrated route.
+  useEffect(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+    button.dataset.clientReady = "true";
+    return () => { delete button.dataset.clientReady; };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
 
