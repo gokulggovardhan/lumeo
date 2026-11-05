@@ -175,7 +175,8 @@ function isExpectedOfficeRuntimeDiagnostic(
       normalized === "still waiting on run dependencies:" ||
       normalized === "(end of list)" ||
       normalized === "dependency: wasm-instantiate" ||
-      /^dependency: fp \\/(?:android|instdir)\\/[A-Za-z0-9_.\\/-]+$/.test(normalized)
+      normalized.startsWith("dependency: fp /android/") ||
+      normalized.startsWith("dependency: fp /instdir/")
     )
   ) {
     return true;
