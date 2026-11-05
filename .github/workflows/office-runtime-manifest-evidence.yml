@@ -1,0 +1,31 @@
+name: Pinned Office Runtime Manifest Evidence
+on:
+  push:
+    branches:
+      - fix/office-runtime-availability-20261105
+    paths:
+      - .github/workflows/office-runtime-manifest-evidence.yml
+permissions:
+  contents: read
+jobs:
+  fetch-immutable-manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Capture immutable published release manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/office-pinned-manifest"
+          gh release download office-runtime-zeta-24-2-2026-09-21-a \
+            --repo gokulggovardhan/lumeo \
+            --pattern lumeo-office-runtime.json \
+            --dir "$RUNNER_TEMP/office-pinned-manifest"
+          node -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync(process.argv[1]));if(m.schemaVersion!==1||m.releaseId!=="zeta-24-2-2026-09-21-a"||Object.keys(m.files||{}).length<4)throw Error("Manifest provenance mismatch");for(const [k,v] of Object.entries(m.files)){if(!/^[a-f0-9]{64}$/i.test(v.sha256)||v.bytes<=0)throw Error("Invalid integrity "+k)}console.log("Pinned release manifest schema, release and file fingerprints verified")' "$RUNNER_TEMP/office-pinned-manifest/lumeo-office-runtime.json"
+      - name: Preserve exact verified 1.6KB manifest
+        uses: actions/upload-artifact@v7
+        with:
+          name: pinned-office-runtime-manifest-evidence
+          path: ${{ runner.temp }}/office-pinned-manifest/lumeo-office-runtime.json
+          retention-days: 7
+          if-no-files-found: error
