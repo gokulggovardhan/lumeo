@@ -59,7 +59,7 @@ jobs:
           # Supabase container long enough to keep one of the fixed dev ports
           # bound. Clean only this disposable local project before starting it.
           npx supabase stop --no-backup >/dev/null 2>&1 || true
-          npx supabase start
+          bash scripts/ci-start-supabase.sh
 
       - name: Configure public catalog environment
         shell: bash
