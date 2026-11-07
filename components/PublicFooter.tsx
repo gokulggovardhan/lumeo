@@ -73,9 +73,28 @@ export default function PublicFooter() {
             </div>
           ))}
         </nav>
-        <p className="border-t border-[var(--border-hairline)] pt-5 text-xs text-[var(--text-muted)] md:col-span-2">
-          &copy; {year} Lumeo PDF Workspace
-        </p>
+        <div className="flex flex-col items-center gap-3 border-t border-[var(--border-hairline)] pt-5 text-xs text-[var(--text-muted)] sm:flex-row sm:justify-between md:col-span-2">
+          <p>&copy; {year} Lumeo PDF Workspace</p>
+          <a
+            href="https://www.cloudflare.com/"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-hairline)] bg-[rgba(255,253,248,0.03)] px-4 py-2 text-[var(--text-secondary)] transition-colors hover:border-[var(--text-accent)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--canvas-secondary)] motion-reduce:transition-none"
+          >
+            <svg
+              aria-hidden="true"
+              focusable="false"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0 text-[var(--text-accent)]"
+            >
+              <path d="M7 18a5 5 0 1 1 1.2-9.85A6 6 0 0 1 19 10a4 4 0 0 1 0 8H7Z" />
+            </svg>
+            <span>Powered by <span className="font-semibold text-[var(--text-primary)]">Cloudflare</span></span>
+          </a>
+        </div>
       </div>
     </L2PublicFooter>
   );
