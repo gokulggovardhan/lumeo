@@ -417,7 +417,7 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
   // centre targets the control itself, so exercise the actual accessible
   // rotate action directly instead of requiring pointer hover.
   await rotateButton.click();
-  await expect(page.getByText(/Rotated 90°/)).toBeVisible();
+  // The file metadata is intentionally visually hidden on narrow mobile\n  // layouts, but must still reflect the native rotation state.\n  await expect(page.getByText(/Rotated 90°/)).toHaveCount(1);
 
   await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
   const downloadButton = page.getByRole("button", { name: "Download merged PDF" });
