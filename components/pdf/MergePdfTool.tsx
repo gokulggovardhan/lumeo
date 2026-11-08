@@ -27,6 +27,8 @@ import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import { mergePdfInBackground } from "@/lib/pdf/merge/mergeWorkerClient";
+import { compressPdfInBackground } from "@/lib/pdf/optimization/compressionWorkerClient";
+import { validatePdfOutput } from "@/lib/pdf/optimization/validateOutput";
 import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import {
   hasPdfMagicBytes,
@@ -299,6 +301,10 @@ export default function MergePdfTool() {
   const mergeAbortRef = useRef<AbortController | null>(null);
   const [mergeProgress, setMergeProgress] = useState(0);
   const [mergeProgressLabel, setMergeProgressLabel] = useState("");
+  const [mergeCompression, setMergeCompression] = useState<"none" | "recommended" | "maximum" | "target">("none");
+  const [mergeTargetValue, setMergeTargetValue] = useState("500");
+  const [mergeTargetUnit, setMergeTargetUnit] = useState<"KB" | "MB">("KB");
+  const [mergeResultSummary, setMergeResultSummary] = useState("");
 
   const totalSize = useMemo(
     () => files.reduce((sum, item) => sum + item.file.size, 0),
@@ -473,6 +479,7 @@ export default function MergePdfTool() {
   };
 
   const resetReadyState = () => {
+    setMergeResultSummary("");
     mergeAbortRef.current?.abort();
     setMergeProgress(0);
     setError("");
@@ -493,6 +500,10 @@ export default function MergePdfTool() {
     setOutputName("lumeo-merged.pdf");
     setDownloadName("lumeo-merged.pdf");
     setPageFormat("original");
+    setMergeCompression("none");
+    setMergeTargetValue("500");
+    setMergeTargetUnit("KB");
+    setMergeResultSummary("");
     setMarginPreset("clean");
     setShowOutputOptions(false);
     closePreview();
@@ -654,6 +665,13 @@ export default function MergePdfTool() {
       return;
     }
     if (mergeAbortRef.current) return;
+    const requestedBytes = Math.round(Number(mergeTargetValue) * (mergeTargetUnit === "MB" ? 1024 * 1024 : 1024));
+    if (mergeCompression === "target" && (
+      !Number.isSafeInteger(requestedBytes) || requestedBytes < 20 * 1024 || requestedBytes > 128 * 1024 * 1024
+    )) {
+      setError("Choose a target between 20 KB and 128 MB.");
+      return;
+    }
     const controller = new AbortController();
     mergeAbortRef.current = controller;
     setError("");
@@ -682,7 +700,7 @@ export default function MergePdfTool() {
         controller.signal,
         (completed, total) => {
           if (controller.signal.aborted) return;
-          setMergeProgress(Math.round((completed / Math.max(1, total)) * 100));
+          setMergeProgress(Math.round((completed / Math.max(1, total)) * (mergeCompression === "none" ? 95 : 70)));
           setMergeProgressLabel(`Processing page ${completed} of ${total}`);
         },
       );
@@ -691,7 +709,37 @@ export default function MergePdfTool() {
         throw new Error("Output validation failed. Page count changed during merging.");
       }
 
-      const mergedBuffer = merged.bytes;
+      let mergedBuffer = merged.bytes;
+      let targetStatus = "";
+      const mergedOriginalBytes = mergedBuffer.byteLength;
+      if (mergeCompression !== "none") {
+        setMergeProgressLabel("Optimising the merged PDF");
+        const result = await compressPdfInBackground(
+          mergedBuffer,
+          mergeCompression === "maximum" ? "maximum" : mergeCompression === "target" ? "target" : "recommended",
+          mergeCompression === "target" ? requestedBytes : undefined,
+          controller.signal,
+          (progress, stage) => {
+            if (controller.signal.aborted) return;
+            setMergeProgress(70 + Math.round(progress * 0.25));
+            setMergeProgressLabel(stage);
+          },
+        );
+        if (controller.signal.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+        mergedBuffer = result.bytes;
+        if (mergeCompression === "target") {
+          targetStatus = result.achieved
+            ? "Target achieved"
+            : "Target not reached — smallest acceptable result offered";
+        }
+      }
+      setMergeProgressLabel("Validating merged PDF");
+      await validatePdfOutput(mergedBuffer, merged.pageCount);
+      if (controller.signal.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+      const reduction = mergedOriginalBytes > mergedBuffer.byteLength
+        ? ` · Saved ${((mergedOriginalBytes - mergedBuffer.byteLength) / mergedOriginalBytes * 100).toFixed(1)}%`
+        : "";
+      setMergeResultSummary(`${formatFileSize(mergedBuffer.byteLength)}${reduction}${targetStatus ? ` · ${targetStatus}` : ""}`);
       const blob = new Blob([mergedBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const safeName = sanitizePdfFileName(outputName);
@@ -1056,6 +1104,47 @@ export default function MergePdfTool() {
               </div>
             ) : null}
 
+            <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.03)] p-3">
+              <label htmlFor="merge-compression" className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
+                PDF optimisation
+              </label>
+              <select
+                id="merge-compression"
+                value={mergeCompression}
+                disabled={isMerging}
+                onChange={(event) => { setMergeCompression(event.target.value as typeof mergeCompression); resetReadyState(); }}
+                className="mt-2 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--atelier-surface-3)] px-3 text-sm font-medium text-[var(--text-primary)]"
+              >
+                <option value="none">Original quality · recommended</option>
+                <option value="recommended">Smart optimised</option>
+                <option value="maximum">Maximum compression</option>
+                <option value="target">Custom target size</option>
+              </select>
+              {mergeCompression === "target" ? (
+                <div className="mt-3 grid grid-cols-[1fr_5.5rem] gap-2">
+                  <label className="text-xs font-medium text-[var(--text-secondary)]">
+                    Target size
+                    <input type="number" inputMode="decimal" min="0.02" step="0.1"
+                      value={mergeTargetValue}
+                      onChange={(event) => { setMergeTargetValue(event.target.value); resetReadyState(); }}
+                      className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-transparent px-3 text-base text-[var(--text-primary)]"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-[var(--text-secondary)]">
+                    Unit
+                    <select value={mergeTargetUnit}
+                      onChange={(event) => { setMergeTargetUnit(event.target.value as "KB" | "MB"); resetReadyState(); }}
+                      className="mt-1 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--atelier-surface-3)] px-2 text-sm text-[var(--text-primary)]">
+                      <option value="KB">KB</option>
+                      <option value="MB">MB</option>
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                Optimisation uses local browser processing. Custom size is a best effort, never a guarantee.
+              </p>
+            </div>
             <label className="mt-3 block rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.03)] p-3">
               <span className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
                 File name
@@ -1079,7 +1168,7 @@ export default function MergePdfTool() {
         {downloadUrl ? (
           <>
             <span className="mr-auto text-xs font-bold text-[var(--text-secondary)]">
-              {downloadName} · {outputStyleLabel} · {totalPages} pages
+              {downloadName} · {outputStyleLabel} · {totalPages} pages{mergeResultSummary ? ` · ${mergeResultSummary}` : ""}
             </span>
             <button
               type="button"
