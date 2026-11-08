@@ -1205,6 +1205,21 @@ export default function CompressPdfTool() {
     return { bytes, textPagesPreserved };
   }
 
+  function reportSuccessfulCompression(startedAt: number, fileName: string, fileSize: number, pageCount: number) {
+    track({
+      eventName: "processing_succeeded",
+      toolSlug: "compress",
+      durationMs: performance.now() - startedAt,
+      success: true,
+    });
+    recordRecentFile({
+      tool: "compress",
+      filename: fileName,
+      fileSize,
+      pageCount,
+    });
+  }
+
   async function handleCompress() {
     if (!analysis || isCompressing || blockingError) return;
     if (compressionMode === "target" && targetError) {
@@ -1302,14 +1317,7 @@ export default function CompressPdfTool() {
         setProgressDetail(compressionMode === "target"
           ? response.achieved ? "Target achieved and verified." : "Best available result; target not guaranteed."
           : "Compression complete.");
-        track({
-          eventName: "processing_succeeded", toolSlug: "compress",
-          durationMs: performance.now() - startedAt, success: true,
-        });
-        recordRecentFile({
-          tool: "compress", filename: outputFileName,
-          fileSize: actualSize, pageCount: analysis.pageCount,
-        });
+        reportSuccessfulCompression(startedAt, outputFileName, actualSize, analysis.pageCount);
         return;
       }
 
@@ -1540,18 +1548,7 @@ export default function CompressPdfTool() {
       setProgressDetail(
         compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
       );
-      track({
-        eventName: "processing_succeeded",
-        toolSlug: "compress",
-        durationMs: performance.now() - startedAt,
-        success: true,
-      });
-      recordRecentFile({
-        tool: "compress",
-        filename: outputFileName,
-        fileSize: blob.size,
-        pageCount: analysis.pageCount,
-      });
+      reportSuccessfulCompression(startedAt, outputFileName, blob.size, analysis.pageCount);
     } catch (compressError) {
       if (currentSession !== sessionRef.current) return;
       const message =
