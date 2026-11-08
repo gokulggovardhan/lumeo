@@ -159,7 +159,15 @@ export async function mergeNativeDocuments(
         marginPoints: options.marginPoints,
         clockwiseDegrees: normalizeRotation(sourceRotation + rotation),
       });
-      const embedded = await merged.embedPage(sourcePage);
+      // Embed precisely the visible CropBox, not the entire MediaBox.
+      // Otherwise a fitted output could reveal visually hidden source
+      // margins or shift native content relative to the placement math.
+      const embedded = await merged.embedPage(sourcePage, {
+        left: crop.x,
+        bottom: crop.y,
+        right: crop.x + crop.width,
+        top: crop.y + crop.height,
+      });
       const page = merged.addPage([pageSize.width, pageSize.height]);
       page.drawRectangle({ x: 0, y: 0, width: pageSize.width, height: pageSize.height, color: rgb(1, 1, 1) });
       page.drawPage(embedded, {
