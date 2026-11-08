@@ -1,4 +1,4 @@
-import { optimizeNativePdfImages, type NativeOptimizationResult } from "./nativeImages.ts";
+import { optimizeNativePdfImages, type NativeOptimizationResult, type NativeImageSettings } from "./nativeImages.ts";
 import { transcodeJpegInWorker } from "./nativeJpegCodec.ts";
 import { searchNativePdfTarget, type TargetSearchOutcome } from "./adaptiveTarget.ts";
 
@@ -11,6 +11,7 @@ export type PdfCompressionResponse = {
   targetOutcome?: TargetSearchOutcome;
   optimizedImages: number;
   codecAvailable: boolean;
+  protectedReason?: string;
 };
 
 /**
@@ -23,6 +24,7 @@ export async function runNativeCompression(
   goal: PdfCompressionGoal,
   targetBytes: number | undefined,
   onProgress?: (value: number, stage: string) => void,
+  settingsOverride?: NativeImageSettings,
 ): Promise<PdfCompressionResponse> {
   const inputBytes = originalBytes.byteLength;
   const codecAvailable =
@@ -69,10 +71,11 @@ export async function runNativeCompression(
       targetOutcome = lossless.outputBytes < inputBytes ? "closest-safe" : "no-benefit";
     }
   } else if (codecAvailable) {
-    const settings =
+    const settings = settingsOverride ?? (
       goal === "high-quality" ? { dpi: 250, quality: 0.91 }
         : goal === "maximum" ? { dpi: 96, quality: 0.49 }
-          : { dpi: 170, quality: 0.78 };
+          : { dpi: 170, quality: 0.78 }
+    );
     result = await optimizeNativePdfImages(
       lossless.bytes, "smart", settings, transcodeJpegInWorker,
       ({ completed, total, stage }) => {
@@ -99,5 +102,6 @@ export async function runNativeCompression(
     targetOutcome,
     optimizedImages: result.optimizedImages,
     codecAvailable,
+    protectedReason: result.protectedReason ?? lossless.protectedReason,
   };
 }
