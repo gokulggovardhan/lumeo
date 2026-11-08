@@ -340,6 +340,10 @@ export default function MergePdfTool() {
     };
   }, [downloadUrl]);
 
+  useEffect(() => {
+    return () => mergeAbortRef.current?.abort();
+  }, []);
+
   // Generates a page-1 thumbnail for every file (regenerated when its rotation
   // changes) and drops thumbnails for files no longer selected.
   useEffect(() => {
@@ -766,8 +770,7 @@ export default function MergePdfTool() {
     {
       value: "smartA4Portrait",
       label: "Smart A4 Portrait",
-      detail: "Clean, same-size PDF output.",
-      recommended: true,
+      detail: "Native, searchable pages fitted to A4.",
     },
     {
       value: "smartA4Landscape",
@@ -782,7 +785,8 @@ export default function MergePdfTool() {
     {
       value: "original",
       label: "Keep original size",
-      detail: "Preserve every source page size.",
+      detail: "Recommended · preserve native text, vectors and page dimensions.",
+      recommended: true,
     },
   ];
 
