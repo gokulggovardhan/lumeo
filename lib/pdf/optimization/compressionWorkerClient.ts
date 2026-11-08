@@ -1,3 +1,4 @@
+import type { NativeImageSettings } from "./nativeImages.ts";
 import type {
   PdfCompressionGoal,
   PdfCompressionResponse,
@@ -14,6 +15,7 @@ export function compressPdfInBackground(
   targetBytes: number | undefined,
   signal: AbortSignal,
   onProgress: (value: number, stage: string) => void,
+  settingsOverride?: NativeImageSettings,
 ): Promise<PdfCompressionResponse> {
   if (signal.aborted) return Promise.reject(new DOMException("Compression cancelled.", "AbortError"));
   if (typeof Worker === "undefined") {
@@ -60,7 +62,7 @@ export function compressPdfInBackground(
     };
     try {
       const workerBytes = originalBytes.slice(0);
-      worker.postMessage({ type: "compress", bytes: workerBytes, goal, targetBytes }, [workerBytes]);
+      worker.postMessage({ type: "compress", bytes: workerBytes, goal, targetBytes, settingsOverride }, [workerBytes]);
     } catch {
       if (finish()) reject(new Error("The browser could not allocate memory for local compression."));
     }
