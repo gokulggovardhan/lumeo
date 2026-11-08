@@ -124,10 +124,18 @@ export async function mergeNativeDocuments(
     sources.push({ source, rotation: requireLegalRotation(input.rotation) });
   }
 
-  const first = sources[0].source.getPage(0).getCropBox();
+  const firstPage = sources[0].source.getPage(0);
+  const first = firstPage.getCropBox();
+  const firstDisplayRotation = normalizeRotation(
+    requireLegalRotation(firstPage.getRotation().angle) + sources[0].rotation,
+  );
+  const firstIsQuarterTurn = firstDisplayRotation === 90 || firstDisplayRotation === 270;
+  const firstDisplayedSize = firstIsQuarterTurn
+    ? { width: first.height, height: first.width }
+    : { width: first.width, height: first.height };
   const pageSize =
     options.format === "smartA4Landscape" ? { width: A4_HEIGHT, height: A4_WIDTH }
-      : options.format === "matchFirst" ? { width: first.width, height: first.height }
+      : options.format === "matchFirst" ? firstDisplayedSize
         : { width: A4_WIDTH, height: A4_HEIGHT };
 
   const merged = await PDFDocument.create();
