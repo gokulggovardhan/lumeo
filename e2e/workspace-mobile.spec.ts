@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { EDITABLE_TWO_PAGE_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 
 test.beforeAll(async () => {
@@ -397,10 +397,10 @@ test("Phase 13 creator reviews completed local compression and downloads only po
 test("Merge PDF worker downloads native rotated pages with searchable text", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const first = await PDFDocument.create();
-  const firstFont = await first.embedFont("Helvetica");
+  const firstFont = await first.embedFont(StandardFonts.Helvetica);
   first.addPage([420, 600]).drawText("NATIVE ALPHA TEXT", { x: 40, y: 530, size: 18, font: firstFont });
   const second = await PDFDocument.create();
-  const secondFont = await second.embedFont("Helvetica");
+  const secondFont = await second.embedFont(StandardFonts.Helvetica);
   second.addPage([600, 360]).drawText("NATIVE BETA TEXT", { x: 40, y: 290, size: 18, font: secondFont });
 
   await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
