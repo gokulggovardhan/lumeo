@@ -72,7 +72,7 @@ import type { DocumentSession } from "@/lib/pdf/workspace/session";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
-type TargetPreset = "100" | "200" | "400" | "custom";
+type TargetPreset = "50" | "100" | "200" | "400" | "500" | "1024" | "2048" | "custom";
 type CompressStage =
   | "Ready"
   | "Analysing document"
@@ -1749,9 +1749,13 @@ export default function CompressPdfTool() {
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {[
+                      ["50", "Under 50 KB"],
                       ["100", "Under 100 KB"],
                       ["200", "Under 200 KB"],
                       ["400", "Under 400 KB"],
+                      ["500", "Under 500 KB"],
+                      ["1024", "Under 1 MB"],
+                      ["2048", "Under 2 MB"],
                       ["custom", "Custom target"],
                     ].map(([value, label]) => (
                       <button
