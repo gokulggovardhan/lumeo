@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import { PDFDocument } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
@@ -27,6 +26,7 @@ import { recordRecentFile } from "@/lib/recent-files";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { normalizeRotation } from "@/lib/pdf/rotation";
+import { mergePdfInBackground } from "@/lib/pdf/merge/mergeWorkerClient";
 import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import {
   hasPdfMagicBytes,
@@ -59,38 +59,6 @@ async function renderPdfPageToBlobUrl(file: File, scale: number, rotation: numbe
   } finally {
     destroyPdfJsDoc(doc);
   }
-}
-
-// Rasterizes a single page of an already-open pdfjs document so it can be
-// embedded as an image on the merged page -- pdf-lib's own page-rotation
-// mechanisms (setRotation's /Rotate entry vs. drawPage's content-matrix
-// rotate) use different angle conventions and don't compose cleanly with the
-// scale-to-fit-and-center math already used for unrotated pages. Takes an
-// open document rather than a File so a multi-page rotated source is parsed
-// once and reused across all of its pages, not re-decoded per page.
-async function renderOpenDocPageToImageBytes(
-  doc: PDFDocumentProxy,
-  pageNumber: number,
-  rotation: number,
-  scale: number,
-): Promise<{ bytes: Uint8Array; width: number; height: number } | null> {
-  const page = await doc.getPage(pageNumber);
-  const viewport = page.getViewport({ scale, rotation });
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d", { alpha: false });
-  if (!context) return null;
-  canvas.width = Math.max(1, Math.floor(viewport.width));
-  canvas.height = Math.max(1, Math.floor(viewport.height));
-  context.fillStyle = "#FFFFFF";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvas, canvasContext: context, viewport }).promise;
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-  const width = canvas.width;
-  const height = canvas.height;
-  canvas.width = 0;
-  canvas.height = 0;
-  if (!blob) return null;
-  return { bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
 }
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -205,18 +173,6 @@ function getOutputStyleLabel(format: PageFormat) {
   return "Keep original size";
 }
 
-function getOutputPageSize(format: PageFormat, firstPageSize?: PageSize) {
-  if (format === "smartA4Landscape") {
-    return { width: A4_HEIGHT, height: A4_WIDTH };
-  }
-
-  if (format === "matchFirst" && firstPageSize) {
-    return { width: firstPageSize.width, height: firstPageSize.height };
-  }
-
-  return { width: A4_WIDTH, height: A4_HEIGHT };
-}
-
 function isSmartFitFormat(format: PageFormat) {
   return format !== "original";
 }
@@ -313,7 +269,7 @@ export default function MergePdfTool() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const openedTrackedRef = useRef(false);
   const [files, setFiles] = useState<SelectedPdf[]>([]);
-  const [pageFormat, setPageFormat] = useState<PageFormat>("smartA4Portrait");
+  const [pageFormat, setPageFormat] = useState<PageFormat>("original");
   const [marginPreset, setMarginPreset] = useState<MarginPreset>("clean");
   const [status, setStatus] = useState<MergeStatus>("Ready");
   const [error, setError] = useState("");
@@ -340,6 +296,9 @@ export default function MergePdfTool() {
   const renderingThumbnailIdsRef = useRef<Set<string>>(new Set());
   const previewUrlRef = useRef("");
   const previewSessionRef = useRef(0);
+  const mergeAbortRef = useRef<AbortController | null>(null);
+  const [mergeProgress, setMergeProgress] = useState(0);
+  const [mergeProgressLabel, setMergeProgressLabel] = useState("");
 
   const totalSize = useMemo(
     () => files.reduce((sum, item) => sum + item.file.size, 0),
@@ -354,7 +313,6 @@ export default function MergePdfTool() {
   const selectedMargin =
     marginOptions.find((option) => option.value === marginPreset)?.points ?? 24;
 
-  const firstPageSize = files[0]?.pageSizes[0];
   const outputStyleLabel = getOutputStyleLabel(pageFormat);
   const showMarginOptions = isSmartFitFormat(pageFormat);
   const selectedMarginOption =
@@ -511,6 +469,8 @@ export default function MergePdfTool() {
   };
 
   const resetReadyState = () => {
+    mergeAbortRef.current?.abort();
+    setMergeProgress(0);
     setError("");
     setStatus("Ready");
     setCleanupMessage("");
@@ -518,6 +478,8 @@ export default function MergePdfTool() {
   };
 
   const startNewMerge = () => {
+    mergeAbortRef.current?.abort();
+    setMergeProgress(0);
     clearDownload();
     setFiles([]);
     setError("");
@@ -526,13 +488,15 @@ export default function MergePdfTool() {
     setCleanupMessage("");
     setOutputName("lumeo-merged.pdf");
     setDownloadName("lumeo-merged.pdf");
-    setPageFormat("smartA4Portrait");
+    setPageFormat("original");
     setMarginPreset("clean");
     setShowOutputOptions(false);
     closePreview();
   };
 
   const clearAllFiles = () => {
+    mergeAbortRef.current?.abort();
+    setMergeProgress(0);
     clearDownload();
     setFiles([]);
     setError("");
@@ -676,128 +640,54 @@ export default function MergePdfTool() {
     resetReadyState();
   };
 
+  const cancelMerge = () => {
+    mergeAbortRef.current?.abort();
+  };
+
   const mergePdfs = async () => {
     if (files.length < 2) {
       setError("Please add at least two PDF files.");
       return;
     }
-
+    if (mergeAbortRef.current) return;
+    const controller = new AbortController();
+    mergeAbortRef.current = controller;
     setError("");
+    setMergeProgress(0);
+    setMergeProgressLabel("Reading selected files");
     setStatus("Merging in your browser...");
     clearDownload();
 
-    const RASTER_SCALE = 2;
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "merge" });
 
     try {
-      const mergedPdf = await PDFDocument.create();
-
+      const inputs: Array<{ name: string; bytes: ArrayBuffer; rotation: number }> = [];
       for (const item of files) {
-        try {
-        const outputPageSize = getOutputPageSize(pageFormat, firstPageSize);
-        const rotation = normalizeRotation(item.rotation);
-
-        if (rotation === 0) {
-          const bytes = await item.file.arrayBuffer();
-          const sourcePdf = await PDFDocument.load(bytes, {
-            ignoreEncryption: false,
-          });
-
-          if (pageFormat === "original") {
-            const copiedPages = await mergedPdf.copyPages(
-              sourcePdf,
-              sourcePdf.getPageIndices(),
-            );
-            copiedPages.forEach((page) => mergedPdf.addPage(page));
-            continue;
-          }
-
-          for (const sourcePage of sourcePdf.getPages()) {
-            const embeddedPage = await mergedPdf.embedPage(sourcePage);
-            const { width: sourceWidth, height: sourceHeight } = sourcePage.getSize();
-            const availableWidth = outputPageSize.width - selectedMargin * 2;
-            const availableHeight = outputPageSize.height - selectedMargin * 2;
-            const scale = Math.min(
-              availableWidth / sourceWidth,
-              availableHeight / sourceHeight,
-            );
-            const drawWidth = sourceWidth * scale;
-            const drawHeight = sourceHeight * scale;
-            const x = (outputPageSize.width - drawWidth) / 2;
-            const y = (outputPageSize.height - drawHeight) / 2;
-            const page = mergedPdf.addPage([outputPageSize.width, outputPageSize.height]);
-
-            page.drawRectangle({
-              x: 0,
-              y: 0,
-              width: outputPageSize.width,
-              height: outputPageSize.height,
-              color: rgb(1, 1, 1),
-            });
-            page.drawPage(embeddedPage, { x, y, width: drawWidth, height: drawHeight });
-          }
-          continue;
-        }
-
-        // Rotated file: rasterize each page at the rotated orientation (pdfjs's
-        // viewport rotation already swaps width/height correctly) and embed as
-        // an image. Sidesteps pdf-lib's page-rotation angle conventions, which
-        // don't compose cleanly with the existing scale-to-fit-and-center math.
-        // The source document is decoded once and reused across every page,
-        // not re-parsed per page.
-        const sourceBytes = await item.file.arrayBuffer();
-        const openDoc = await openPdfJsDocument(sourceBytes);
-        try {
-          for (let pageNumber = 1; pageNumber <= item.pageCount; pageNumber += 1) {
-            const rendered = await renderOpenDocPageToImageBytes(openDoc, pageNumber, rotation, RASTER_SCALE);
-            if (!rendered) continue;
-            const image = await mergedPdf.embedJpg(rendered.bytes);
-            const sourceWidth = rendered.width / RASTER_SCALE;
-            const sourceHeight = rendered.height / RASTER_SCALE;
-
-            if (pageFormat === "original") {
-              const page = mergedPdf.addPage([sourceWidth, sourceHeight]);
-              page.drawImage(image, { x: 0, y: 0, width: sourceWidth, height: sourceHeight });
-              continue;
-            }
-
-            const availableWidth = outputPageSize.width - selectedMargin * 2;
-            const availableHeight = outputPageSize.height - selectedMargin * 2;
-            const scale = Math.min(
-              availableWidth / sourceWidth,
-              availableHeight / sourceHeight,
-            );
-            const drawWidth = sourceWidth * scale;
-            const drawHeight = sourceHeight * scale;
-            const x = (outputPageSize.width - drawWidth) / 2;
-            const y = (outputPageSize.height - drawHeight) / 2;
-            const page = mergedPdf.addPage([outputPageSize.width, outputPageSize.height]);
-
-            page.drawRectangle({
-              x: 0,
-              y: 0,
-              width: outputPageSize.width,
-              height: outputPageSize.height,
-              color: rgb(1, 1, 1),
-            });
-            page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
-          }
-        } finally {
-          destroyPdfJsDoc(openDoc);
-        }
-        } catch (itemError) {
-          throw new Error(
-            `"${item.file.name}" could not be merged. ${itemError instanceof Error ? itemError.message : "It may be damaged or password-protected."}`,
-          );
-        }
+        if (controller.signal.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+        inputs.push({
+          name: item.file.name,
+          bytes: await item.file.arrayBuffer(),
+          rotation: item.rotation,
+        });
+      }
+      if (controller.signal.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+      const merged = await mergePdfInBackground(
+        inputs,
+        { format: pageFormat, marginPoints: selectedMargin },
+        controller.signal,
+        (completed, total) => {
+          if (controller.signal.aborted) return;
+          setMergeProgress(Math.round((completed / Math.max(1, total)) * 100));
+          setMergeProgressLabel(`Processing page ${completed} of ${total}`);
+        },
+      );
+      if (controller.signal.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+      if (merged.pageCount !== totalPages) {
+        throw new Error("Output validation failed. Page count changed during merging.");
       }
 
-      const mergedBytes = await mergedPdf.save();
-      const mergedBuffer = mergedBytes.buffer.slice(
-        mergedBytes.byteOffset,
-        mergedBytes.byteOffset + mergedBytes.byteLength,
-      ) as ArrayBuffer;
+      const mergedBuffer = merged.bytes;
       const blob = new Blob([mergedBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const safeName = sanitizePdfFileName(outputName);
@@ -807,16 +697,18 @@ export default function MergePdfTool() {
         kind: "merge",
         fileName: safeName,
         byteLength: mergedBuffer.byteLength,
-        pageCount: totalPages,
+        pageCount: merged.pageCount,
         initialArea: "pages",
       });
       setContinuation({
         bytes: mergedBuffer.slice(0),
         fileName: safeName,
-        pageCount: totalPages,
+        pageCount: merged.pageCount,
         session: fresh.session,
       });
       setCleanupMessage("");
+      setMergeProgress(100);
+      setMergeProgressLabel("Merge validated");
       setStatus("Download ready");
       track({
         eventName: "processing_succeeded",
@@ -824,21 +716,25 @@ export default function MergePdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-      recordRecentFile({ tool: "merge", filename: safeName, fileSize: blob.size, pageCount: totalPages });
+      recordRecentFile({ tool: "merge", filename: safeName, fileSize: blob.size, pageCount: merged.pageCount });
     } catch (mergeError) {
       setStatus("Ready");
       setError(
-        mergeError instanceof Error
-          ? mergeError.message
-          : "Merge failed. Try smaller files or remove damaged PDFs.",
+        mergeError instanceof DOMException && mergeError.name === "AbortError"
+          ? "Merge cancelled. Your source files are unchanged."
+          : mergeError instanceof Error
+            ? mergeError.message
+            : "Merge failed. Try smaller files or remove damaged PDFs.",
       );
       track({
         eventName: "processing_failed",
         toolSlug: "merge",
         durationMs: performance.now() - startedAt,
         success: false,
-        errorCode: "processing_error",
+        errorCode: controller.signal.aborted ? "user_cancelled" : "processing_error",
       });
+    } finally {
+      if (mergeAbortRef.current === controller) mergeAbortRef.current = null;
     }
   };
 
@@ -1198,22 +1094,31 @@ export default function MergePdfTool() {
           </>
         ) : files.length >= 2 ? (
           <>
-            <span className="mr-auto text-xs font-bold text-[var(--text-secondary)]">{readySummary}</span>
-            <button
-              type="button"
-              disabled={isMerging}
-              onClick={mergePdfs}
-              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] disabled:hover:translate-y-0 active:scale-[0.98] sm:w-auto"
-            >
-              {isMerging ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--lumeo-paper-200)]/24 border-t-white" />
-                  Merging in your browser...
-                </>
-              ) : (
-                "Merge PDFs"
-              )}
-            </button>
+            {isMerging ? (
+              <>
+                <div className="mr-auto min-w-0 flex-1" role="status" aria-live="polite">
+                  <p className="truncate text-xs font-semibold text-[var(--text-secondary)]">
+                    {mergeProgressLabel || "Preparing local merge"}
+                  </p>
+                  <progress aria-label="PDF merge progress" value={mergeProgress} max={100} className="mt-2 h-2 w-full accent-[var(--lumeo-gold)]" />
+                </div>
+                <button type="button" onClick={cancelMerge}
+                  className="inline-flex h-11 items-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-bold text-[var(--text-primary)]">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="mr-auto text-xs font-bold text-[var(--text-secondary)]">{readySummary}</span>
+                <button
+                  type="button"
+                  onClick={mergePdfs}
+                  className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+                >
+                  Merge PDFs
+                </button>
+              </>
+            )}
           </>
         ) : (
           <span className="text-sm font-bold text-[var(--text-secondary)]">Add one more PDF to merge.</span>
