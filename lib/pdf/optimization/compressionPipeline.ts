@@ -1,6 +1,6 @@
 import { optimizeNativePdfImages, type NativeOptimizationResult, type NativeImageSettings } from "./nativeImages.ts";
 import { transcodeJpegInWorker } from "./nativeJpegCodec.ts";
-import { searchNativePdfTarget, type TargetSearchOutcome } from "./adaptiveTarget.ts";
+import { searchNativePdfTarget, type TargetSearchOutcome, type TargetAttempt } from "./adaptiveTarget.ts";
 
 export type PdfCompressionGoal = "recommended" | "high-quality" | "maximum" | "target";
 export type PdfCompressionResponse = {
@@ -12,6 +12,7 @@ export type PdfCompressionResponse = {
   optimizedImages: number;
   codecAvailable: boolean;
   protectedReason?: string;
+  attempts?: TargetAttempt[];
 };
 
 /**
@@ -37,6 +38,20 @@ export async function runNativeCompression(
   onProgress?.(10, "Lossless optimisation checked");
   let result: NativeOptimizationResult = lossless;
   let targetOutcome: TargetSearchOutcome | undefined;
+  let attempts: TargetAttempt[] | undefined;
+  if (lossless.protectedReason) {
+    onProgress?.(100, "Original preserved for document safety");
+    return {
+      bytes: lossless.bytes,
+      originalBytes: inputBytes,
+      finalBytes: lossless.bytes.byteLength,
+      achieved: goal === "target" ? lossless.bytes.byteLength <= (targetBytes ?? 0) : null,
+      targetOutcome: goal === "target" ? "no-benefit" : undefined,
+      optimizedImages: 0,
+      codecAvailable,
+      protectedReason: lossless.protectedReason,
+    };
+  }
 
   if (goal === "target") {
     if (!Number.isSafeInteger(targetBytes) || !targetBytes || targetBytes < 20 * 1024) {
@@ -67,6 +82,7 @@ export async function runNativeCompression(
         applied: adaptive.bytes.byteLength < inputBytes,
       };
       targetOutcome = adaptive.outcome;
+      attempts = adaptive.attempts;
     } else {
       targetOutcome = lossless.outputBytes < inputBytes ? "closest-safe" : "no-benefit";
     }
@@ -103,5 +119,6 @@ export async function runNativeCompression(
     optimizedImages: result.optimizedImages,
     codecAvailable,
     protectedReason: result.protectedReason ?? lossless.protectedReason,
+    attempts,
   };
 }
