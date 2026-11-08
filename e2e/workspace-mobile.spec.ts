@@ -415,7 +415,7 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
   await expect(rotateButton).toBeAttached({ timeout: 30_000 });
   await page.getByRole("button", { name: "Preview native-alpha.pdf" }).hover();
   await rotateButton.click();
-  await expect(page.getByText(/Rotated 90°/)).toBeVisible();
+  await expect(page.getByText(/Rotated 90°/)).toHaveCount(1);
 
   await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
   const downloadButton = page.getByRole("button", { name: "Download merged PDF" });
@@ -442,4 +442,88 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
   const textB = await (await doc.getPage(2)).getTextContent();
   expect(textA.items.map((item) => "str" in item ? item.str : "").join(" ")).toContain("NATIVE ALPHA TEXT");
   expect(textB.items.map((item) => "str" in item ? item.str : "").join(" ")).toContain("NATIVE BETA TEXT");
+});
+
+
+const JPEG_FOR_NATIVE_COMPRESSION =
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=";
+
+async function makePdfWithCompressibleImage(label: string) {
+  const originalJpeg = Buffer.from(JPEG_FOR_NATIVE_COMPRESSION, "base64");
+  const comment = Buffer.alloc(12_000, 65);
+  const paddedJpeg = Buffer.concat([
+    originalJpeg.subarray(0, 2),
+    Buffer.from([0xff, 0xfe, (comment.length + 2) >> 8, (comment.length + 2) & 255]),
+    comment,
+    originalJpeg.subarray(2),
+  ]);
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const image = await pdf.embedJpg(paddedJpeg);
+  const firstPage = pdf.addPage([350, 500]);
+  firstPage.drawText(label, { x: 32, y: 430, size: 16, font });
+  firstPage.drawImage(image, { x: 50, y: 50, width: 200, height: 200 });
+  const bytes = await pdf.save();
+  return Buffer.from(bytes);
+}
+
+test("Compress PDF shared worker creates downloadable valid PDF with native text", async ({ page }) => {
+  const input = await makePdfWithCompressibleImage("SHARED COMPRESS SOURCE");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/pdf/compress", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles({
+    name: "shared-compress.pdf", mimeType: "application/pdf", buffer: input,
+  });
+  const compress = page.getByRole("button", { name: "Compress PDF", exact: true });
+  await expect(compress).toBeVisible({ timeout: 90_000 });
+  await compress.click();
+  const download = page.getByRole("button", { name: "Download compressed PDF" });
+  await expect(download).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await download.click();
+  const output = await downloadPromise;
+  const result = await readFile((await output.path())!);
+  expect(result.byteLength).toBeLessThanOrEqual(input.byteLength);
+  const document = await PDFDocument.load(result);
+  expect(document.getPageCount()).toBe(1);
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(result), useSystemFonts: true }).promise;
+  const content = await (await doc.getPage(1)).getTextContent();
+  expect(content.items.map((item) => "str" in item ? item.str : "").join(" ")).toContain("SHARED COMPRESS SOURCE");
+});
+
+test("Merge PDF optional smart optimisation uses shared worker without changing pages", async ({ page }) => {
+  const first = await makePdfWithCompressibleImage("SHARED MERGE ALPHA");
+  const second = await makePdfWithCompressibleImage("SHARED MERGE BETA");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles([
+    { name: "merge-a.pdf", mimeType: "application/pdf", buffer: first },
+    { name: "merge-b.pdf", mimeType: "application/pdf", buffer: second },
+  ]);
+  const quality = page.getByLabel("PDF optimisation");
+  await expect(quality).toBeVisible({ timeout: 30_000 });
+  await quality.selectOption("recommended");
+  await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
+  const download = page.getByRole("button", { name: "Download merged PDF" });
+  await expect(download).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await download.click();
+  const saved = await downloadPromise;
+  const result = await readFile((await saved.path())!);
+  const document = await PDFDocument.load(result);
+  expect(document.getPageCount()).toBe(2);
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(result), useSystemFonts: true }).promise;
+  const pageTexts: string[] = [];
+  for (let i = 1; i <= 2; i++) {
+    const t = await (await doc.getPage(i)).getTextContent();
+    pageTexts.push(t.items.map((item) => "str" in item ? item.str : "").join(" "));
+  }
+  expect(pageTexts[0]).toContain("SHARED MERGE ALPHA");
+  expect(pageTexts[1]).toContain("SHARED MERGE BETA");
 });
