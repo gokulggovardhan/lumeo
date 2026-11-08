@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { findEmbeddedJpegs } from "../lib/pdf/embeddedImages.ts";
 import { optimizeNativePdfImages } from "../lib/pdf/optimization/nativeImages.ts";
 
@@ -91,4 +91,23 @@ test("invalid resource budgets are rejected before constructing temporary output
   const input = await imageFixture();
   await assert.rejects(optimizeNativePdfImages(input, "smart", { dpi: 1, quality: 0.8 }), /Invalid quality/);
   await assert.rejects(optimizeNativePdfImages(input, "smart", { dpi: 150, quality: 0.01 }), /Invalid quality/);
+});
+
+test("noncanonical JPEG Decode dictionaries are left untouched to preserve rendering semantics", async () => {
+  const source = await PDFDocument.load(await imageFixture());
+  const [{ ref }] = findEmbeddedJpegs(source.getPage(0));
+  const image = source.context.lookup(ref);
+  assert.ok(image instanceof PDFRawStream);
+  image.dict.set(PDFName.of("Decode"), source.context.obj([1, 0, 1, 0, 1, 0]));
+  const bytes = await source.save();
+  const input = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const output = await optimizeNativePdfImages(
+    input, "maximum", { dpi: 96, quality: 0.48 }, async () => ORIGINAL_JPEG,
+  );
+  assert.equal(output.optimizedImages, 0);
+  const verified = await PDFDocument.load(output.bytes);
+  const [{ ref: outputImageRef }] = findEmbeddedJpegs(verified.getPage(0));
+  const keptImage = verified.context.lookup(outputImageRef);
+  assert.ok(keptImage instanceof PDFRawStream);
+  assert.ok(keptImage.dict.has(PDFName.of("Decode")));
 });
