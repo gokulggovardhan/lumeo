@@ -110,7 +110,14 @@ try {
     assert(!file.startsWith("supabase/migrations/"), `Supabase migration changed: ${file}`);
   }
 
-  assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge algorithm markers changed unexpectedly.");
+  const nativeMerge = read("lib/pdf/merge/nativeMerge.ts");
+  const mergeWorker = read("lib/pdf/merge/mergeWorkerClient.ts");
+  assert(mergeTool.includes("mergePdfInBackground(") &&
+    nativeMerge.includes("PDFDocument.create()") &&
+    nativeMerge.includes("copyPages(") &&
+    nativeMerge.includes("validatePdfOutput(") &&
+    mergeWorker.includes("new Worker("),
+    "Native Merge PDF processing, worker and output integrity markers changed unexpectedly.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split algorithm markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
   assert(/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Approved analytics lifecycle events must remain present.");
