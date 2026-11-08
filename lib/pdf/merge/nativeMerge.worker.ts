@@ -15,7 +15,7 @@ self.onmessage = async (event: MessageEvent<MergeWorkerRequest>) => {
         self.postMessage({ type: "progress", completed, total });
       },
     });
-    self.postMessage({ type: "result", value: result }, [result.bytes]);
+    self.postMessage({ type: "result", value: result }, { transfer: [result.bytes] });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to merge these PDF files.";
     self.postMessage({ type: "error", message });
