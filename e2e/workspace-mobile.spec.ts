@@ -446,31 +446,49 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
 });
 
 
-// 16 x 16 baseline JPEG generated with Pillow, verified SOI/EOI and decodable.
-const JPEG_FOR_NATIVE_COMPRESSION =
-  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwMDAgQDAwMEBAQFBgoGBgUFBgwICQcKDgwPDg4MDQ0PERYTDxAVEQ0NExoTFRcYGRkZDxIbHRsYHRYYGRj/2wBDAQQEBAYFBgsGBgsYEA0QGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBj/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5l0Xwh9391+leiaL4Q+7+6/Su30Xwh9391+lei6L4Q+7+6/SuXDYkrg3jL4feP//Z";
-
-async function makePdfWithCompressibleImage(label: string) {
-  const originalJpeg = Buffer.from(JPEG_FOR_NATIVE_COMPRESSION, "base64");
-  const comment = Buffer.alloc(12_000, 65);
-  const paddedJpeg = Buffer.concat([
-    originalJpeg.subarray(0, 2),
-    Buffer.from([0xff, 0xfe, (comment.length + 2) >> 8, (comment.length + 2) & 255]),
-    comment,
-    originalJpeg.subarray(2),
-  ]);
+// Generate an actual JPEG using each target browser's native encoder.
+// This independently tests real browser image compatibility without a
+// hand-written JPEG payload or a new external test dependency.
+async function makePdfWithCompressibleImage(page: Page, label: string) {
+  const dataUrl = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 640;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable in browser fixture");
+    const gradient = ctx.createLinearGradient(0, 0, 640, 640);
+    gradient.addColorStop(0, "#264653");
+    gradient.addColorStop(0.5, "#f4a261");
+    gradient.addColorStop(1, "#e76f51");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 640, 640);
+    for (let i = 0; i < 35; i++) {
+      ctx.fillStyle = `rgba(${(i * 23) % 256}, ${(i * 41) % 256}, 80, 0.4)`;
+      ctx.beginPath();
+      ctx.arc((i * 79) % 640, (i * 117) % 640, 16 + (i * 7) % 100, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return canvas.toDataURL("image/jpeg", 0.98);
+  });
+  if (!dataUrl.startsWith("data:image/jpeg;base64,")) {
+    throw new Error("Browser JPEG fixture encoding failed");
+  }
+  const jpegBytes = Buffer.from(dataUrl.slice("data:image/jpeg;base64,".length), "base64");
+  if (jpegBytes[0] !== 0xff || jpegBytes[1] !== 0xd8 ||
+      jpegBytes[jpegBytes.length - 2] !== 0xff || jpegBytes[jpegBytes.length - 1] !== 0xd9) {
+    throw new Error("Browser JPEG fixture did not have valid SOI/EOI markers");
+  }
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const image = await pdf.embedJpg(paddedJpeg);
+  const image = await pdf.embedJpg(jpegBytes);
   const firstPage = pdf.addPage([350, 500]);
   firstPage.drawText(label, { x: 32, y: 430, size: 16, font });
   firstPage.drawImage(image, { x: 50, y: 50, width: 200, height: 200 });
-  const bytes = await pdf.save();
-  return Buffer.from(bytes);
+  return Buffer.from(await pdf.save());
 }
 
 test("Compress PDF shared worker creates downloadable valid PDF with native text", async ({ page }) => {
-  const input = await makePdfWithCompressibleImage("SHARED COMPRESS SOURCE");
+  const input = await makePdfWithCompressibleImage(page, "SHARED COMPRESS SOURCE");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/pdf/compress", { waitUntil: "domcontentloaded" });
   const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
@@ -497,8 +515,8 @@ test("Compress PDF shared worker creates downloadable valid PDF with native text
 });
 
 test("Merge PDF optional smart optimisation uses shared worker without changing pages", async ({ page }) => {
-  const first = await makePdfWithCompressibleImage("SHARED MERGE ALPHA");
-  const second = await makePdfWithCompressibleImage("SHARED MERGE BETA");
+  const first = await makePdfWithCompressibleImage(page, "SHARED MERGE ALPHA");
+  const second = await makePdfWithCompressibleImage(page, "SHARED MERGE BETA");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
   const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
