@@ -323,8 +323,13 @@ test("core processing algorithms remain unchanged by lifecycle analytics instrum
   const split = readFileSync("components/pdf/SplitPdfTool.tsx", "utf8");
   const compress = readFileSync("components/pdf/CompressPdfTool.tsx", "utf8");
 
-  assert.match(merge, /PDFDocument\.create/);
-  assert.match(merge, /mergedPdf\.save/);
+  const nativeMerge = readFileSync("lib/pdf/merge/nativeMerge.ts", "utf8");
+  const mergeWorker = readFileSync("lib/pdf/merge/mergeWorkerClient.ts", "utf8");
+  assert.match(merge, /mergePdfInBackground/);
+  assert.match(nativeMerge, /PDFDocument\.create/);
+  assert.match(nativeMerge, /merged\.save/);
+  assert.match(nativeMerge, /copyPages/);
+  assert.match(mergeWorker, /new Worker/);
   assert.match(split, /createPdfFromPages/);
   assert.match(split, /new JSZip/);
   assert.match(compress, /buildCompressedCandidate/);
