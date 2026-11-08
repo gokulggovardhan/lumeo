@@ -413,7 +413,9 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
 
   const rotateButton = page.getByRole("button", { name: "Rotate native-alpha.pdf right" });
   await expect(rotateButton).toBeAttached({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Preview native-alpha.pdf" }).hover();
+  // The rotate control overlays the thumbnail; hovering the thumbnail's
+  // centre targets the control itself, so exercise the actual accessible
+  // rotate action directly instead of requiring pointer hover.
   await rotateButton.click();
   await expect(page.getByText(/Rotated 90°/)).toBeVisible();
 
