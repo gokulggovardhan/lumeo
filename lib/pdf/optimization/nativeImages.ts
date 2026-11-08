@@ -146,6 +146,19 @@ export async function optimizeNativePdfImages(
   for (const candidate of candidates.values()) {
     const originalStream = pdf.context.lookup(candidate.ref);
     if (!(originalStream instanceof PDFRawStream)) continue;
+    // Browser canvas re-encoding does not preserve specialised XObject
+    // semantics such as Decode remapping, Interpolate flags, Metadata,
+    // image alternates or optional content groups. Only canonical, opaque
+    // baseline JPEG dictionaries are eligible for replacement.
+    const allowedImageFields = new Set([
+      "Type", "Subtype", "Width", "Height", "ColorSpace",
+      "BitsPerComponent", "Length", "Filter",
+    ]);
+    if (originalStream.dict.keys().some((key) => !allowedImageFields.has(key.decodeText()))) {
+      completed += 1;
+      onProgress?.({ completed, total, stage: "images" });
+      continue;
+    }
     const width = originalStream.dict.lookup(PDFName.of("Width"));
     const height = originalStream.dict.lookup(PDFName.of("Height"));
     if (!(width instanceof PDFNumber) || !(height instanceof PDFNumber)) continue;
