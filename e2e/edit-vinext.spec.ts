@@ -766,30 +766,46 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
 
   const replaceAll = page.getByRole("button", { name: "Replace all safely" });
   await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  // Interrupt the FIRST preflight render inside the browser. A sequence
+  // of Playwright control queries lets the 120-page scan finish in Firefox.
+  // Capture every lock invariant and dispatch Undo in the SAME mutation tick.
+  const interruptedPreflight = page.evaluate(() => new Promise<{
+    findLocked: boolean;
+    replaceLocked: boolean;
+    scopeLocked: boolean;
+    findButtonLocked: boolean;
+    undoEnabled: boolean;
+  }>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      observer.disconnect();
+      reject(new Error("Replace All never entered native preflight."));
+    }, 30_000);
+    const observer = new MutationObserver(() => {
+      const status = document.querySelector("[data-edit-replace-all-status]");
+      if (!status?.textContent?.includes("Checking every match against the native PDF locally")) return;
+      observer.disconnect();
+      window.clearTimeout(timeout);
+      const find = document.querySelector<HTMLInputElement>('input[aria-label="Find text in PDF"]');
+      const replace = document.querySelector<HTMLInputElement>('input[aria-label="Replace search match with"]');
+      const scope = document.querySelector<HTMLSelectElement>('select[aria-label="Search scope"]');
+      const findButton = [...document.querySelectorAll<HTMLButtonElement>("button")]
+        .find((button) => button.textContent?.trim() === "Find");
+      const undo = document.querySelector<HTMLButtonElement>('button[aria-label="Undo"]');
+      const snapshot = {
+        findLocked: find?.disabled === true,
+        replaceLocked: replace?.disabled === true,
+        scopeLocked: scope?.disabled === true,
+        findButtonLocked: findButton?.disabled === true,
+        undoEnabled: undo?.disabled === false,
+      };
+      if (undo && !undo.disabled) undo.click();
+      resolve(snapshot);
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+  }));
   await replaceAll.click();
-
-  const status = page.locator("[data-edit-replace-all-status]");
-  await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
-    timeout: 30_000,
-  });
-
-  // Interrupt at the first observable preflight state. WebKit can scan this
-  // synthetic 120-page file quickly enough that several actionability
-  // assertions before Undo let preflight finish and open confirmation first.
-  // The lock contract is still read in one parallel snapshot so this remains
-  // proof that request controls freeze while history stays interactive.
-  const scope = page.getByRole("combobox", { name: "Search scope" });
-  const findButton = page.getByRole("button", { name: "Find", exact: true });
-  const undo = page.getByRole("button", { name: "Undo" });
-  const [findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled] =
-    await Promise.all([
-      find.isDisabled(),
-      replace.isDisabled(),
-      scope.isDisabled(),
-      findButton.isDisabled(),
-      undo.isEnabled(),
-    ]);
-  expect({ findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled }).toEqual({
+  const lockSnapshot = await interruptedPreflight;
+  expect(lockSnapshot).toEqual({
     findLocked: true,
     replaceLocked: true,
     scopeLocked: true,
@@ -797,11 +813,8 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
     undoEnabled: true,
   });
 
-  // Change the authoritative PDF revision while the 120-page preflight is
-  // still scanning. Replace All must discard its old clone rather than
-  // publishing stale bytes over this Undo result.
-  await undo.click({ force: true });
-
+  // Undo must invalidate the old PDF revision; stale replacements never land.
+  const status = page.locator("[data-edit-replace-all-status]");
   await expect(status).toContainText(/PDF changed while Replace All was checking matches/i, {
     timeout: 90_000,
   });

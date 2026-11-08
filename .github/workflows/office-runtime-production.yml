@@ -203,7 +203,7 @@ jobs:
 
           for attempt in {1..40}; do
             if manifest="$(curl --fail --silent --show-error --max-time 60 "$base/lumeo-office-runtime.json" 2>/dev/null)" &&
-               printf '%s' "$manifest" | grep -Fq "\"releaseId\": \"${{ steps.release.outputs.release_id }}\""; then
+               printf '%s' "$manifest" | node -e 'const fs = require("node:fs"); try { process.exit(JSON.parse(fs.readFileSync(0, "utf8")).releaseId === process.argv[1] ? 0 : 1); } catch { process.exit(1); }' "${{ steps.release.outputs.release_id }}"; then
               echo "Production runtime manifest is live."
               break
             fi

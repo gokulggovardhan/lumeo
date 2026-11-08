@@ -703,13 +703,28 @@ test.describe("browser conversion validation lab", () => {
       mimeType: "application/pdf",
       buffer: slowPdf,
     });
+    // Cancel on the first converting render, before Playwright's remote click
+    // can race the converter's final microtask. Use the REAL Cancel control.
+    const cancelWhileConverting = page.evaluate(() => new Promise<boolean>((resolve, reject) => {
+      const lab = document.querySelector('[data-testid="pdf-lab"]');
+      if (!lab) return reject(new Error("PDF conversion lab is missing."));
+      const timeout = window.setTimeout(() => {
+        observer.disconnect();
+        reject(new Error("PDF conversion did not enter converting state."));
+      }, 30_000);
+      const observer = new MutationObserver(() => {
+        if (lab.getAttribute("data-state") !== "converting") return;
+        observer.disconnect();
+        window.clearTimeout(timeout);
+        const cancel = document.querySelector<HTMLButtonElement>('[data-testid="pdf-cancel"]');
+        const actionable = cancel?.disabled === false;
+        if (actionable) cancel?.click();
+        resolve(actionable);
+      });
+      observer.observe(lab, { attributes: true, attributeFilter: ["data-state"] });
+    }));
     await page.getByTestId("pdf-convert").click();
-
-    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
-      "data-state",
-      "converting",
-    );
-    await page.getByTestId("pdf-cancel").click();
+    expect(await cancelWhileConverting).toBe(true);
     await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
       "data-state",
       "cancelled",
