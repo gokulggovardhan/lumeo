@@ -17,7 +17,7 @@ export type NativeOptimizationResult = {
 
 export type JpegTranscoder = (
   originalJpeg: Uint8Array,
-  dimensions: { width: number; height: number },
+  dimensions: { width: number; height: number; sourceWidth: number; sourceHeight: number },
   settings: NativeImageSettings,
 ) => Promise<Uint8Array | null>;
 
@@ -155,7 +155,9 @@ export async function optimizeNativePdfImages(
     );
     if (!target) continue;
     try {
-      const nextBytes = await transcode(candidate.bytes, target, settings);
+      const nextBytes = await transcode(candidate.bytes, {
+        ...target, sourceWidth: width.asNumber(), sourceHeight: height.asNumber(),
+      }, settings);
       if (!nextBytes || nextBytes.byteLength >= candidate.bytes.byteLength || nextBytes.byteLength < 32) continue;
       const image = await pdf.embedJpg(nextBytes);
       if (image.width !== target.width || image.height !== target.height) continue;
