@@ -5,6 +5,7 @@ import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPa
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
 import { validatePdfOutput } from "@/lib/pdf/optimization/validateOutput";
+import { compressPdfInBackground } from "@/lib/pdf/optimization/compressionWorkerClient";
 import { buildCompressionIntelligence, compressionSamplePageNumbers, wasCompressionPassTried, type CompressionIntelligence } from "@/lib/pdf/compressionIntelligence";
 import {
   compressionProfiles as profiles,
@@ -271,6 +272,9 @@ export default function CompressPdfTool() {
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement | null>(null);
   const outputPreviewRequestRef = useRef(0);
+  const compressionAbortRef = useRef<AbortController | null>(null);
+  const [compressionProgress, setCompressionProgress] = useState(0);
+  const [workerCompressionActive, setWorkerCompressionActive] = useState(false);
 
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
@@ -379,6 +383,7 @@ export default function CompressPdfTool() {
   );
 
   const cleanupTasks = useCallback(async () => {
+    compressionAbortRef.current?.abort();
     try {
       renderTaskRef.current?.cancel();
     } catch {
@@ -453,6 +458,8 @@ export default function CompressPdfTool() {
   }, []);
 
   function resetTool() {
+    compressionAbortRef.current?.abort();
+    setCompressionProgress(0);
     sessionRef.current += 1;
     clearResult();
     clearPreview();
@@ -1199,6 +1206,21 @@ export default function CompressPdfTool() {
     return { bytes, textPagesPreserved };
   }
 
+  function reportSuccessfulCompression(startedAt: number, fileName: string, fileSize: number, pageCount: number) {
+    track({
+      eventName: "processing_succeeded",
+      toolSlug: "compress",
+      durationMs: performance.now() - startedAt,
+      success: true,
+    });
+    recordRecentFile({
+      tool: "compress",
+      filename: fileName,
+      fileSize,
+      pageCount,
+    });
+  }
+
   async function handleCompress() {
     if (!analysis || isCompressing || blockingError) return;
     if (compressionMode === "target" && targetError) {
@@ -1219,6 +1241,88 @@ export default function CompressPdfTool() {
     const currentSession = sessionRef.current;
     let processingDoc: PDFDocumentProxy | null = null;
     try {
+      // The default path uses the same native image/resource core as Merge
+      // PDF. Advanced grayscale and metadata rewrite options retain their
+      // existing explicit legacy behavior, pending worker parity.
+      if (colour === "preserve" && metadata === "preserve" &&
+          !analysis.risks.some((risk) => risk.title === "Digital signature detected")) {
+        const controller = new AbortController();
+        compressionAbortRef.current = controller;
+        setWorkerCompressionActive(true);
+        setCompressionProgress(0);
+        const goal = compressionMode === "target" ? "target"
+          : profile === "highQuality" ? "high-quality"
+            : profile === "smaller" ? "maximum" : "recommended";
+        const response = await compressPdfInBackground(
+          analysis.bytes,
+          goal,
+          compressionMode === "target" ? targetBytes : undefined,
+          controller.signal,
+          (value, stage) => {
+            if (controller.signal.aborted || currentSession !== sessionRef.current) return;
+            setCompressionProgress(value);
+            setStatus("Processing images");
+            setProgressDetail(stage);
+          },
+          compressionMode === "quality" ? {
+            dpi: selectedPlan.dpi,
+            quality: selectedPlan.quality,
+          } : undefined,
+        );
+        if (controller.signal.aborted || currentSession !== sessionRef.current) return;
+        setStatus("Validating output");
+        setProgressDetail("Validating the final PDF locally.");
+        await validatePdfOutput(response.bytes, analysis.pageCount);
+        if (controller.signal.aborted || currentSession !== sessionRef.current) return;
+        const outputBuffer = response.bytes;
+        const actualSize = outputBuffer.byteLength;
+        const blob = new Blob([outputBuffer], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const savedBytes = analysis.size - actualSize;
+        const savedPercent = analysis.size > 0 ? 100 * savedBytes / analysis.size : 0;
+        const targetResult: CompressResult["target"] = compressionMode === "target"
+          ? {
+            outcome: response.achieved ? "achieved"
+              : response.targetOutcome === "closest-safe" ? "closest-safe" : "not-beneficial",
+            requestedBytes: targetBytes,
+            attempts: (response.attempts ?? []).map((attempt, index) => ({
+              pass: index + 1,
+              dpi: attempt.dpi,
+              imageQuality: attempt.quality,
+              outputBytes: attempt.bytes,
+            })),
+            qualityOutlook: qualityOutlookForTarget(analysis.size, targetBytes, analysis.pageCount),
+            textPagesPreserved: 0,
+          } : undefined;
+        setResult({
+          url,
+          bytes: outputBuffer,
+          fileName: outputFileName,
+          originalSize: analysis.size,
+          compressedSize: actualSize,
+          savedBytes,
+          savedPercent,
+          pageCount: analysis.pageCount,
+          mode: compressionMode,
+          profile: compressionMode === "quality" ? profile : undefined,
+          grayscale: false,
+          protectedReason: response.protectedReason,
+          tone: savedPercent >= 5 ? "success" : "limited",
+          target: targetResult,
+        });
+        if (actualSize < analysis.size && !response.protectedReason) {
+          const requestId = ++outputPreviewRequestRef.current;
+          void renderOutputComparison(outputBuffer, analysis.samplePage, currentSession, requestId);
+        }
+        setCompressionProgress(100);
+        setStatus("Download ready");
+        setProgressDetail(compressionMode === "target"
+          ? response.achieved ? "Target achieved and verified." : "Best available result; target not guaranteed."
+          : "Compression complete.");
+        reportSuccessfulCompression(startedAt, outputFileName, actualSize, analysis.pageCount);
+        return;
+      }
+
       const pdfJs = await loadPdfJsModule();
       const loadingTask = pdfJs.getDocument({
         data: new Uint8Array(copyArrayBuffer(analysis.bytes)),
@@ -1446,18 +1550,7 @@ export default function CompressPdfTool() {
       setProgressDetail(
         compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
       );
-      track({
-        eventName: "processing_succeeded",
-        toolSlug: "compress",
-        durationMs: performance.now() - startedAt,
-        success: true,
-      });
-      recordRecentFile({
-        tool: "compress",
-        filename: outputFileName,
-        fileSize: blob.size,
-        pageCount: analysis.pageCount,
-      });
+      reportSuccessfulCompression(startedAt, outputFileName, blob.size, analysis.pageCount);
     } catch (compressError) {
       if (currentSession !== sessionRef.current) return;
       const message =
@@ -1481,6 +1574,8 @@ export default function CompressPdfTool() {
         errorCode: "processing_error",
       });
     } finally {
+      compressionAbortRef.current = null;
+      setWorkerCompressionActive(false);
       if (processingDoc) {
         try {
           await (processingDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
@@ -1547,6 +1642,60 @@ export default function CompressPdfTool() {
             {error}
           </div>
         ) : null}
+      </section>
+    );
+  }
+
+  if (isCompressing) {
+    return (
+      <section className="l2-workspace mx-auto grid w-full max-w-[720px] gap-5 pb-8">
+        {workspaceDocument ? (
+          <WorkspaceDocumentBinding
+            area="optimize"
+            fileName={analysis.name}
+            bytes={analysis.bytes}
+            pageCount={analysis.pageCount}
+            document={workspaceDocument}
+          />
+        ) : null}
+        <L2WorkspaceHeader
+          title="Compressing your PDF"
+          description={`${analysis.name} · ${formatFileSize(analysis.size)} · ${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"}`}
+        />
+        <div role="status" aria-live="polite" className="aura-glass-regular rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] p-6 shadow-[var(--v2-elevation-3)] sm:p-10">
+          <div className="mx-auto flex max-w-md flex-col gap-5 text-center">
+            <div aria-hidden="true" className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[var(--atelier-surface-2)] text-[var(--lumeo-gold)]">
+              <CompressIcon />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">
+                Optimising your document
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {progressDetail || "Preparing your document locally"}
+              </p>
+            </div>
+            <progress
+              aria-label="PDF compression progress"
+              value={workerCompressionActive ? compressionProgress : undefined}
+              max={100}
+              className="h-2.5 w-full accent-[var(--lumeo-gold)]"
+            />
+            {workerCompressionActive ? (
+              <button
+                type="button"
+                onClick={() => compressionAbortRef.current?.abort()}
+                className="mx-auto inline-flex h-11 min-w-32 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]"
+              >
+                Cancel
+              </button>
+            ) : null}
+            <p className="text-xs leading-5 text-[var(--text-muted)]">
+              Processing stays in this browser. Keep this tab open until the PDF is ready.
+            </p>
+          </div>
+        </div>
+        <L2PrivacyNote />
       </section>
     );
   }
@@ -2014,9 +2163,25 @@ export default function CompressPdfTool() {
               {result.protectedReason ? "Download unchanged original PDF" : "Download compressed PDF"}
             </button>
           </>
+        ) : isCompressing ? (
+          <div className="flex w-full items-center gap-3">
+            <div className="min-w-0 flex-1" role="status" aria-live="polite">
+              <p className="truncate text-xs font-semibold text-[var(--text-secondary)]">
+                {progressDetail || "Optimising in your browser"}
+              </p>
+              <progress aria-label="PDF compression progress" value={compressionProgress} max={100}
+                className="mt-1 h-2 w-full accent-[var(--lumeo-gold)]" />
+            </div>
+            {workerCompressionActive ? (
+              <button type="button" onClick={() => compressionAbortRef.current?.abort()}
+                className="inline-flex h-11 items-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-bold text-[var(--text-primary)]">
+                Cancel
+              </button>
+            ) : null}
+          </div>
         ) : (
           <button type="button" disabled={!canCompress} onClick={handleCompress} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
-            {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
+            {error ? "Retry compression" : "Compress PDF"}
           </button>
         )}
       </ToolActionBar>
