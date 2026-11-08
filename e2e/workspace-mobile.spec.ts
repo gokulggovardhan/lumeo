@@ -413,8 +413,9 @@ test("Merge PDF worker downloads native rotated pages with searchable text", asy
 
   const rotateButton = page.getByRole("button", { name: "Rotate native-alpha.pdf right" });
   await expect(rotateButton).toBeAttached({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Preview native-alpha.pdf" }).hover();
   await rotateButton.click();
+  // The file metadata is intentionally visually hidden on narrow mobile
+  // layouts, but must still reflect the native rotation state.
   await expect(page.getByText(/Rotated 90°/)).toHaveCount(1);
 
   await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
