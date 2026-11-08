@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
+import { validatePdfOutput } from "@/lib/pdf/optimization/validateOutput";
 import { buildCompressionIntelligence, compressionSamplePageNumbers, wasCompressionPassTried, type CompressionIntelligence } from "@/lib/pdf/compressionIntelligence";
 import {
   compressionProfiles as profiles,
@@ -1413,13 +1414,7 @@ export default function CompressPdfTool() {
 
       setStatus("Validating output");
       setProgressDetail("Validating output.");
-      const validationPdf = await PDFDocument.load(copyArrayBuffer(outputBuffer));
-      if (validationPdf.getPageCount() !== analysis.pageCount) {
-        throw new Error("Output validation failed. Page count did not match the original.");
-      }
-      if (outputBytes.byteLength <= 0) {
-        throw new Error("Output validation failed. The generated PDF was empty.");
-      }
+      await validatePdfOutput(outputBuffer, analysis.pageCount);
 
       setStatus("Finalising download");
       const blob = new Blob([outputBuffer], { type: "application/pdf" });
