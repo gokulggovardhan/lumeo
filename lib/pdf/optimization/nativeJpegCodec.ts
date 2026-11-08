@@ -1,4 +1,5 @@
 import type { JpegTranscoder } from "./nativeImages.ts";
+import { measureSampledRgbFidelity, passesSampledJpegFidelity } from "./fidelity.ts";
 
 /**
  * Local browser image re-encoder. Kept in the dedicated PDF worker:
@@ -40,7 +41,30 @@ export const transcodeJpegInWorker: JpegTranscoder = async (jpeg, dimensions, se
         data[data.length - 2] !== 0xff || data[data.length - 1] !== 0xd9) {
       return null;
     }
-    return data;
+    // Limit visual-comparison allocations to 96 × 96 RGBA pixels. Reject
+    // visibly degraded re-encodes; no source-sized pixel array is allocated.
+    const sampleWidth = Math.min(96, dimensions.width);
+    const sampleHeight = Math.min(96, dimensions.height);
+    const sampleCanvas = new OffscreenCanvas(sampleWidth, sampleHeight);
+    const sampleCtx = sampleCanvas.getContext("2d", { alpha: false });
+    if (!sampleCtx) return null;
+    sampleCtx.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
+    const expected = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+    const candidateBitmap = await createImageBitmap(encoded);
+    try {
+      if (candidateBitmap.width !== dimensions.width ||
+          candidateBitmap.height !== dimensions.height) return null;
+      sampleCtx.clearRect(0, 0, sampleWidth, sampleHeight);
+      sampleCtx.drawImage(candidateBitmap, 0, 0, sampleWidth, sampleHeight);
+      const actual = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
+      const evidence = measureSampledRgbFidelity(expected, actual);
+      if (!passesSampledJpegFidelity(evidence, settings.quality)) return null;
+      return data;
+    } finally {
+      candidateBitmap.close();
+      sampleCanvas.width = 0;
+      sampleCanvas.height = 0;
+    }
   } catch {
     return null;
   } finally {
