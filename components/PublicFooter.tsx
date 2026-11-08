@@ -81,7 +81,7 @@ export default function PublicFooter() {
             alt="Protected by Cloudflare"
             width={761}
             height={264}
-            className="h-auto w-[220px] max-w-full"
+            className="h-auto w-40 max-w-full"
             unoptimized
           />
         </div>
