@@ -132,7 +132,14 @@ try {
   }
   assert(splitTool.includes("Examples: 1-3, 5, odd, even, all, or 1-end."), "Split page-range helper changed unexpectedly.");
 
-  assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF creation markers changed unexpectedly.");
+  const nativeMerge = read("lib/pdf/merge/nativeMerge.ts");
+  const mergeWorker = read("lib/pdf/merge/mergeWorkerClient.ts");
+  assert(mergeTool.includes("mergePdfInBackground(") &&
+    nativeMerge.includes("PDFDocument.create()") &&
+    nativeMerge.includes("copyPages(") &&
+    nativeMerge.includes("validatePdfOutput(") &&
+    mergeWorker.includes("new Worker("),
+    "Merge must use the native worker engine, page copying, and output validation.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split ZIP/page-copy markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio"), "Target Size Studio must remain present.");
   assert(compressTool.includes("inputId=\"compress-pdf-upload\"") && compressTool.includes("multiple={false}") && compressTool.includes("onFilesSelected={handleFiles}"), "Compress must use the shared one-file upload contract.");
