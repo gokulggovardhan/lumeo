@@ -1646,6 +1646,60 @@ export default function CompressPdfTool() {
     );
   }
 
+  if (isCompressing) {
+    return (
+      <section className="l2-workspace mx-auto grid w-full max-w-[720px] gap-5 pb-8">
+        {workspaceDocument ? (
+          <WorkspaceDocumentBinding
+            area="optimize"
+            fileName={analysis.name}
+            bytes={analysis.bytes}
+            pageCount={analysis.pageCount}
+            document={workspaceDocument}
+          />
+        ) : null}
+        <L2WorkspaceHeader
+          title="Compressing your PDF"
+          description={`${analysis.name} · ${formatFileSize(analysis.size)} · ${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"}`}
+        />
+        <div role="status" aria-live="polite" className="aura-glass-regular rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] p-6 shadow-[var(--v2-elevation-3)] sm:p-10">
+          <div className="mx-auto flex max-w-md flex-col gap-5 text-center">
+            <div aria-hidden="true" className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[var(--atelier-surface-2)] text-[var(--lumeo-gold)]">
+              <CompressIcon />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">
+                Optimising your document
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {progressDetail || "Preparing your document locally"}
+              </p>
+            </div>
+            <progress
+              aria-label="PDF compression progress"
+              value={workerCompressionActive ? compressionProgress : undefined}
+              max={100}
+              className="h-2.5 w-full accent-[var(--lumeo-gold)]"
+            />
+            {workerCompressionActive ? (
+              <button
+                type="button"
+                onClick={() => compressionAbortRef.current?.abort()}
+                className="mx-auto inline-flex h-11 min-w-32 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]"
+              >
+                Cancel
+              </button>
+            ) : null}
+            <p className="text-xs leading-5 text-[var(--text-muted)]">
+              Processing stays in this browser. Keep this tab open until the PDF is ready.
+            </p>
+          </div>
+        </div>
+        <L2PrivacyNote />
+      </section>
+    );
+  }
+
   return (
     <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
       {workspaceDocument ? (
