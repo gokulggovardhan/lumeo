@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { mergeNativeDocuments, nativePagePlacement } from "../lib/pdf/merge/nativeMerge.ts";
 
@@ -101,4 +101,48 @@ test("native merger rejects invalid inputs without generating a downloadable PDF
     { name: "one.pdf", bytes: await fixture("FIRST"), rotation: 45 },
     { name: "two.pdf", bytes: await fixture("SECOND"), rotation: 0 },
   ], { format: "original", marginPoints: 0 }), /unsupported rotation/);
+});
+
+test("match-first layout follows the first page's actual displayed rotation", async () => {
+  const first = await fixture("ROTATED SOURCE", 90, 400, 600);
+  const second = await fixture("NEXT SOURCE", 0, 500, 800);
+  const merged = await mergeNativeDocuments([
+    { name: "first.pdf", bytes: first, rotation: 0 },
+    { name: "second.pdf", bytes: second, rotation: 0 },
+  ], { format: "matchFirst", marginPoints: 24 });
+  const doc = await PDFDocument.load(merged.bytes);
+  assert.equal(doc.getPageCount(), 2);
+  assert.deepEqual(doc.getPages().map((page) => page.getSize()), [
+    { width: 600, height: 400 },
+    { width: 600, height: 400 },
+  ]);
+  const text = await extractPdfText(merged.bytes);
+  assert.match(text, /ROTATED SOURCE/);
+  assert.match(text, /NEXT SOURCE/);
+});
+
+test("fitted pages embed only the visible source CropBox while retaining native text", async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([500, 700]);
+  page.setCropBox(100, 80, 200, 260);
+  const font = await source.embedFont(StandardFonts.Helvetica);
+  page.drawText("CROPBOX CONTENT", { x: 110, y: 200, size: 16, font });
+  const bytes = await source.save();
+  const croppedBytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const merged = await mergeNativeDocuments([
+    { name: "crop.pdf", bytes: croppedBytes, rotation: 0 },
+    { name: "plain.pdf", bytes: await fixture("OTHER CONTENT"), rotation: 0 },
+  ], { format: "smartA4Portrait", marginPoints: 24 });
+  const document = await PDFDocument.load(merged.bytes);
+  assert.equal(document.getPageCount(), 2);
+  assert.match(await extractPdfText(merged.bytes), /CROPBOX CONTENT/);
+  const contents = document.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"));
+  assert.ok(contents instanceof PDFDict);
+  const embeddedForms = contents.values().map((entry) => document.context.lookup(entry));
+  const firstForm = embeddedForms.find((entry) => entry instanceof PDFRawStream);
+  assert.ok(firstForm instanceof PDFRawStream);
+  const bbox = firstForm.dict.lookup(PDFName.of("BBox"));
+  assert.ok(bbox instanceof PDFArray);
+  assert.deepEqual(bbox.asArray().map((value) =>
+    value instanceof PDFNumber ? value.asNumber() : Number.NaN), [100, 80, 300, 340]);
 });
