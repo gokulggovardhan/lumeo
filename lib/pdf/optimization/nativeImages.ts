@@ -159,6 +159,19 @@ export async function optimizeNativePdfImages(
       onProgress?.({ completed, total, stage: "images" });
       continue;
     }
+    // Canvas JPEG output uses 8-bit DeviceRGB. Do not transform CMYK,
+    // grayscale, ICCBased or custom-filter resources into RGB without a
+    // verified colour-management pipeline.
+    const colour = originalStream.dict.lookup(PDFName.of("ColorSpace"));
+    const depth = originalStream.dict.lookup(PDFName.of("BitsPerComponent"));
+    const filter = originalStream.dict.lookup(PDFName.of("Filter"));
+    if (!(colour instanceof PDFName) || colour.toString() !== "/DeviceRGB" ||
+        !(depth instanceof PDFNumber) || depth.asNumber() !== 8 ||
+        !(filter instanceof PDFName) || filter.toString() !== "/DCTDecode") {
+      completed += 1;
+      onProgress?.({ completed, total, stage: "images" });
+      continue;
+    }
     const width = originalStream.dict.lookup(PDFName.of("Width"));
     const height = originalStream.dict.lookup(PDFName.of("Height"));
     if (!(width instanceof PDFNumber) || !(height instanceof PDFNumber)) continue;
