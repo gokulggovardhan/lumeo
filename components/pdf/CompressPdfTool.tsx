@@ -274,6 +274,7 @@ export default function CompressPdfTool() {
   const outputPreviewRequestRef = useRef(0);
   const compressionAbortRef = useRef<AbortController | null>(null);
   const [compressionProgress, setCompressionProgress] = useState(0);
+  const [workerCompressionActive, setWorkerCompressionActive] = useState(false);
 
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
@@ -1247,6 +1248,7 @@ export default function CompressPdfTool() {
           !analysis.risks.some((risk) => risk.title === "Digital signature detected")) {
         const controller = new AbortController();
         compressionAbortRef.current = controller;
+        setWorkerCompressionActive(true);
         setCompressionProgress(0);
         const goal = compressionMode === "target" ? "target"
           : profile === "highQuality" ? "high-quality"
@@ -1573,6 +1575,7 @@ export default function CompressPdfTool() {
       });
     } finally {
       compressionAbortRef.current = null;
+      setWorkerCompressionActive(false);
       if (processingDoc) {
         try {
           await (processingDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
@@ -2115,7 +2118,7 @@ export default function CompressPdfTool() {
               <progress aria-label="PDF compression progress" value={compressionProgress} max={100}
                 className="mt-1 h-2 w-full accent-[var(--lumeo-gold)]" />
             </div>
-            {compressionAbortRef.current ? (
+            {workerCompressionActive ? (
               <button type="button" onClick={() => compressionAbortRef.current?.abort()}
                 className="inline-flex h-11 items-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-bold text-[var(--text-primary)]">
                 Cancel
