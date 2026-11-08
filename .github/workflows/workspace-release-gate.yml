@@ -133,7 +133,7 @@ jobs:
               contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
           config.write_text(contents)
           PY
-          npx supabase start
+          bash scripts/ci-start-supabase.sh
 
       - name: Configure public catalog environment
         shell: bash
@@ -317,7 +317,7 @@ jobs:
               contents = contents.rstrip() + "\n\n[inbucket]\nenabled = false\n"
           config.write_text(contents)
           PY
-          npx supabase start
+          bash scripts/ci-start-supabase.sh
 
       - name: Configure public catalog environment
         shell: bash

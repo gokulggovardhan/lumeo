@@ -80,7 +80,7 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
-          npx supabase start
+          bash scripts/ci-start-supabase.sh
 
       - name: Configure public catalog environment
         shell: bash

@@ -200,6 +200,12 @@ export default function BrowserConversionLab() {
         },
         controller.signal,
       );
+      if (controller.signal.aborted) {
+        setPdfResult(null);
+        setPdfState("cancelled");
+        setPdfMessage("Conversion cancelled");
+        return;
+      }
       setPdfResult(result);
       setPdfState("success");
       setPdfMessage("Ready to download");
@@ -212,9 +218,22 @@ export default function BrowserConversionLab() {
         setPdfState("error");
         setPdfMessage(normalized.message);
       }
-    } finally {
-      if (pdfAbortRef.current === controller) pdfAbortRef.current = null;
     }
+  }
+
+  // Retain the AbortController until the state change has committed. A fast
+  // conversion may settle while Cancel is still clickable in an old render.
+  useEffect(() => {
+    if (pdfState !== "converting") pdfAbortRef.current = null;
+  }, [pdfState]);
+
+  function cancelPdf() {
+    const controller = pdfAbortRef.current;
+    if (!controller) return;
+    controller.abort();
+    setPdfResult(null);
+    setPdfState("cancelled");
+    setPdfMessage("Conversion cancelled");
   }
 
   return (
@@ -358,7 +377,7 @@ export default function BrowserConversionLab() {
               <button
                 data-testid="pdf-cancel"
                 type="button"
-                onClick={() => pdfAbortRef.current?.abort()}
+                onClick={cancelPdf}
                 disabled={pdfState !== "converting"}
                 className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-35"
               >
