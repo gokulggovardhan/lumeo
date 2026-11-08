@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
+import { validatePdfOutput } from "@/lib/pdf/optimization/validateOutput";
 import { buildCompressionIntelligence, compressionSamplePageNumbers, wasCompressionPassTried, type CompressionIntelligence } from "@/lib/pdf/compressionIntelligence";
 import {
   compressionProfiles as profiles,
@@ -71,7 +72,7 @@ import type { DocumentSession } from "@/lib/pdf/workspace/session";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
-type TargetPreset = "100" | "200" | "400" | "custom";
+type TargetPreset = "50" | "100" | "200" | "400" | "500" | "1024" | "2048" | "custom";
 type CompressStage =
   | "Ready"
   | "Analysing document"
@@ -1413,13 +1414,7 @@ export default function CompressPdfTool() {
 
       setStatus("Validating output");
       setProgressDetail("Validating output.");
-      const validationPdf = await PDFDocument.load(copyArrayBuffer(outputBuffer));
-      if (validationPdf.getPageCount() !== analysis.pageCount) {
-        throw new Error("Output validation failed. Page count did not match the original.");
-      }
-      if (outputBytes.byteLength <= 0) {
-        throw new Error("Output validation failed. The generated PDF was empty.");
-      }
+      await validatePdfOutput(outputBuffer, analysis.pageCount);
 
       setStatus("Finalising download");
       const blob = new Blob([outputBuffer], { type: "application/pdf" });
@@ -1754,9 +1749,13 @@ export default function CompressPdfTool() {
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     {[
+                      ["50", "Under 50 KB"],
                       ["100", "Under 100 KB"],
                       ["200", "Under 200 KB"],
                       ["400", "Under 400 KB"],
+                      ["500", "Under 500 KB"],
+                      ["1024", "Under 1 MB"],
+                      ["2048", "Under 2 MB"],
                       ["custom", "Custom target"],
                     ].map(([value, label]) => (
                       <button

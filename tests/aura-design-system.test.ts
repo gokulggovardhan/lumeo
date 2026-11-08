@@ -369,8 +369,13 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
   const splitTool = read("components/pdf/SplitPdfTool.tsx");
   const compressTool = read("components/pdf/CompressPdfTool.tsx");
 
-  assert.ok(mergeTool.includes("PDFDocument.create()"));
-  assert.ok(mergeTool.includes("copyPages"));
+  const nativeMerge = read("lib/pdf/merge/nativeMerge.ts");
+  const mergeWorker = read("lib/pdf/merge/mergeWorkerClient.ts");
+  assert.ok(mergeTool.includes("mergePdfInBackground("));
+  assert.ok(nativeMerge.includes("PDFDocument.create()"));
+  assert.ok(nativeMerge.includes("copyPages("));
+  assert.ok(nativeMerge.includes("validatePdfOutput("));
+  assert.ok(mergeWorker.includes("new Worker("));
   assert.ok(splitTool.includes("JSZip"));
   assert.ok(splitTool.includes("copyPages"));
   assert.ok(compressTool.includes("Target Size Studio"));

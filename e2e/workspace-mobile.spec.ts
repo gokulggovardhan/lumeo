@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { EDITABLE_TWO_PAGE_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 
 test.beforeAll(async () => {
@@ -389,4 +389,61 @@ test("Phase 13 creator reviews completed local compression and downloads only po
   });
   expect(jsonText).not.toMatch(/filename|sourceId|documentId|originalBytes|outputBytes|pdfBytes|https?:\/\//i);
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeVisible();
+});
+
+
+// Exercises the real UI -> browser Worker -> native PDF -> Download path across
+// Chromium, Firefox and WebKit in the existing release gate. No remote PDF upload.
+test("Merge PDF worker downloads native rotated pages with searchable text", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const first = await PDFDocument.create();
+  const firstFont = await first.embedFont(StandardFonts.Helvetica);
+  first.addPage([420, 600]).drawText("NATIVE ALPHA TEXT", { x: 40, y: 530, size: 18, font: firstFont });
+  const second = await PDFDocument.create();
+  const secondFont = await second.embedFont(StandardFonts.Helvetica);
+  second.addPage([600, 360]).drawText("NATIVE BETA TEXT", { x: 40, y: 290, size: 18, font: secondFont });
+
+  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles([
+    { name: "native-alpha.pdf", mimeType: "application/pdf", buffer: Buffer.from(await first.save()) },
+    { name: "native-beta.pdf", mimeType: "application/pdf", buffer: Buffer.from(await second.save()) },
+  ]);
+
+  const rotateButton = page.getByRole("button", { name: "Rotate native-alpha.pdf right" });
+  await expect(rotateButton).toBeAttached({ timeout: 30_000 });
+  // The rotate control overlays the thumbnail; hovering the thumbnail's
+  // centre targets the control itself, so exercise the actual accessible
+  // rotate action directly instead of requiring pointer hover.
+  await rotateButton.click();
+  // The file metadata is intentionally visually hidden on narrow mobile
+  // layouts, but must still reflect the native rotation state.
+  await expect(page.getByText(/Rotated 90°/)).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
+  const downloadButton = page.getByRole("button", { name: "Download merged PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).toBeTruthy();
+  const resultBytes = await readFile(outputPath!);
+  const merged = await PDFDocument.load(resultBytes);
+  expect(merged.getPageCount()).toBe(2);
+  expect(merged.getPages().map((p) => p.getRotation().angle)).toEqual([90, 0]);
+  expect(merged.getPages().map((p) => p.getSize())).toEqual([
+    { width: 420, height: 600 },
+    { width: 600, height: 360 },
+  ]);
+
+  // PDF.js must still see real, selectable text on each native PDF page.
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: new Uint8Array(resultBytes), useSystemFonts: true });
+  const doc = await task.promise;
+  const textA = await (await doc.getPage(1)).getTextContent();
+  const textB = await (await doc.getPage(2)).getTextContent();
+  expect(textA.items.map((item) => "str" in item ? item.str : "").join(" ")).toContain("NATIVE ALPHA TEXT");
+  expect(textB.items.map((item) => "str" in item ? item.str : "").join(" ")).toContain("NATIVE BETA TEXT");
 });

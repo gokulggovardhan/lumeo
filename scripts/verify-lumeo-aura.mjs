@@ -130,7 +130,14 @@ try {
   const merge = read("components/pdf/MergePdfTool.tsx");
   const split = read("components/pdf/SplitPdfTool.tsx");
   const compress = read("components/pdf/CompressPdfTool.tsx");
-  assert(merge.includes("PDFDocument.create()"), "Merge PDF processing algorithm appears changed or missing.");
+  const nativeMerge = read("lib/pdf/merge/nativeMerge.ts");
+  const mergeWorker = read("lib/pdf/merge/mergeWorkerClient.ts");
+  assert(merge.includes("mergePdfInBackground(") &&
+    nativeMerge.includes("PDFDocument.create()") &&
+    nativeMerge.includes("copyPages(") &&
+    nativeMerge.includes("validatePdfOutput(") &&
+    mergeWorker.includes("new Worker("),
+    "Merge PDF must use the verified native worker engine with page copying and output validation.");
   assert(split.includes("JSZip"), "Split PDF ZIP processing appears changed or missing.");
   assert(compress.includes("buildCompressedCandidate"), "Compress PDF processing appears changed or missing.");
 
