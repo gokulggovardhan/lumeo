@@ -111,3 +111,23 @@ test("noncanonical JPEG Decode dictionaries are left untouched to preserve rende
   assert.ok(keptImage instanceof PDFRawStream);
   assert.ok(keptImage.dict.has(PDFName.of("Decode")));
 });
+
+test("CMYK or custom color spaces are never implicitly converted into RGB JPEG", async () => {
+  const document = await PDFDocument.load(await imageFixture());
+  const [{ ref }] = findEmbeddedJpegs(document.getPage(0));
+  const resource = document.context.lookup(ref);
+  assert.ok(resource instanceof PDFRawStream);
+  resource.dict.set(PDFName.of("ColorSpace"), PDFName.of("DeviceCMYK"));
+  const bytes = await document.save();
+  const input = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  let transcodeCalls = 0;
+  const output = await optimizeNativePdfImages(
+    input, "maximum", { dpi: 96, quality: 0.49 }, async () => {
+      transcodeCalls += 1;
+      return ORIGINAL_JPEG;
+    },
+  );
+  assert.equal(transcodeCalls, 0, "CMYK image must be excluded before browser RGB transcoding");
+  assert.equal(output.optimizedImages, 0);
+  assert.equal((await PDFDocument.load(output.bytes)).getPageCount(), 2);
+});
