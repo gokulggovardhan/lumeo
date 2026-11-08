@@ -878,6 +878,40 @@ export default function MergePdfTool() {
     );
   }
 
+  if (isMerging) {
+    return (
+      <section className="l2-workspace mx-auto grid w-full max-w-[720px] gap-5 pb-8">
+        <L2WorkspaceHeader
+          title="Merging your PDFs"
+          description={`${files.length} files · ${totalPages} pages · ${outputStyleLabel}`}
+        />
+        <div role="status" aria-live="polite" className="aura-glass-regular rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] p-6 shadow-[var(--v2-elevation-3)] sm:p-10">
+          <div className="mx-auto flex max-w-md flex-col gap-5 text-center">
+            <div aria-hidden="true" className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[var(--atelier-surface-2)] text-[var(--lumeo-gold)]">
+              <MergeIcon />
+            </div>
+            <div>
+              <h2 className="font-serif text-xl font-semibold text-[var(--text-primary)]">Preparing your merged PDF</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {mergeProgressLabel || "Combining your files locally"}
+              </p>
+            </div>
+            <progress aria-label="PDF merge progress" value={mergeProgress} max={100}
+              className="h-2.5 w-full accent-[var(--lumeo-gold)]" />
+            <button type="button" onClick={cancelMerge}
+              className="mx-auto inline-flex h-11 min-w-32 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]">
+              Cancel
+            </button>
+            <p className="text-xs leading-5 text-[var(--text-muted)]">
+              All processing happens on this device. Keep the tab open until the PDF is ready.
+            </p>
+          </div>
+        </div>
+        <L2PrivacyNote />
+      </section>
+    );
+  }
+
   return (
     <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
       <input
