@@ -10,7 +10,7 @@ test("fallback Office runtime retries 504 and 429 without losing HEAD or immutab
   let count = 0;
   const methods: string[] = [];
   const cacheModes: Array<RequestCache | undefined> = [];
-  globalThis.fetch = (async (_input, init) => {
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     count++;
     methods.push(init?.method ?? "");
     cacheModes.push(init?.cache);
@@ -37,7 +37,7 @@ test("fallback Office runtime retries 504 and 429 without losing HEAD or immutab
 test("fallback Office runtime preserves a successful Range stream and never retries it", async () => {
   const prior = globalThis.fetch;
   let count = 0;
-  globalThis.fetch = (async (_input, init) => {
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     count++;
     assert.equal(new Headers(init?.headers).get("Range"), "bytes=0-0");
     assert.equal(init?.method, "GET");
