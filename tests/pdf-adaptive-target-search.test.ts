@@ -85,3 +85,33 @@ test("invalid targets and inconsistent candidate size reports fail without fake 
     makeCandidate: async () => ({ bytes: source, outputBytes: 1 }),
   }), /Invalid PDF candidate length/);
 });
+
+test("measured JPEG fidelity overrides profile guesses when selecting an achieved target", async () => {
+  let attempt = 0;
+  const outcome = await searchNativePdfTarget({
+    originalBytes: new ArrayBuffer(120_000),
+    targetBytes: 60_000,
+    maxAttempts: 2,
+    makeCandidate: async () => {
+      attempt++;
+      return attempt === 1
+        ? { bytes: new ArrayBuffer(54_000), outputBytes: 54_000, fidelityScore: 0.91 }
+        : { bytes: new ArrayBuffer(49_000), outputBytes: 49_000, fidelityScore: 0.98 };
+    },
+  });
+  assert.equal(outcome.outcome, "achieved");
+  assert.equal(outcome.bytes.byteLength, 49_000,
+    "smaller but measurably better candidate must win even when its settings looked more aggressive");
+  assert.deepEqual(outcome.attempts.map((item) => item.fidelityScore), [0.91, 0.98]);
+});
+
+test("invalid measured fidelity is rejected rather than trusted", async () => {
+  await assert.rejects(searchNativePdfTarget({
+    originalBytes: new ArrayBuffer(120_000),
+    targetBytes: 60_000,
+    maxAttempts: 1,
+    makeCandidate: async () => ({
+      bytes: new ArrayBuffer(49_000), outputBytes: 49_000, fidelityScore: Number.NaN,
+    }),
+  }), /Invalid measured PDF candidate fidelity/);
+});
