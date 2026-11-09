@@ -367,6 +367,44 @@ async function waitForL2UploadReady(page: Page) {
   return input;
 }
 
+/**
+ * Confirm that a DOCX selection reached the connected Word workspace rather
+ * than trusting a synthetic file-input event alone. During an Office engine
+ * bootstrap, the Remove action is intentionally unavailable, so observe the
+ * selected filename in the toolbar instead of treating loading as a failure.
+ *
+ * A dropped synthetic change can be retried once, as already done for PDF-to-
+ * Word, but a real application selection failure must still fail visibly.
+ */
+async function selectWordForConversion(
+  page: Page,
+  input: { name: string; buffer: Buffer },
+): Promise<void> {
+  const fileInput = await waitForL2UploadReady(page);
+  const payload = {
+    name: input.name,
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer: input.buffer,
+  };
+  const selectedName = page
+    .locator(".l2-workspace-deep span[title]")
+    .filter({ hasText: input.name })
+    .first();
+
+  await fileInput.setInputFiles(payload);
+  const firstSelectionObserved = await expect(selectedName)
+    .toBeVisible({ timeout: 10_000 })
+    .then(() => true, () => false);
+
+  if (!firstSelectionObserved) {
+    await fileInput.setInputFiles([]);
+    await fileInput.setInputFiles(payload);
+  }
+
+  await expect(selectedName).toBeVisible({ timeout: 30_000 });
+}
+
 async function convertPdfToWord(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
@@ -405,16 +443,7 @@ async function convertWordToPdf(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<Buffer> {
-  const fileInput = await waitForL2UploadReady(page);
-  await fileInput.setInputFiles({
-    name: input.name,
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    buffer: input.buffer,
-  });
-  await expect(
-    page.getByRole("button", { name: `Remove ${input.name}` }),
-  ).toBeVisible();
+  await selectWordForConversion(page, input);
 
   const convertButton = page.getByRole("button", { name: "Convert to PDF" });
   await expect(convertButton).toBeEnabled({ timeout: 180_000 });
@@ -560,10 +589,8 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   const runtime = watchConversionRuntime(page);
   await gotoProductionRoute(page, "/pdf/word-to-pdf");
   const source = await makeProfessionalDocx();
-  await (await waitForL2UploadReady(page)).setInputFiles({
+  await selectWordForConversion(page, {
     name: `capability-${browserName}.docx`,
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: source,
   });
 
