@@ -12,7 +12,8 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: ["workspace-mobile.spec.ts"],
-  grep: /^(Merge PDF worker downloads native rotated pages with searchable text|Compress PDF shared worker creates downloadable valid PDF with native text|Merge PDF optional smart optimisation uses shared worker without changing pages)$/,
+  // Playwright matches against fully qualified titles, including suite/file context.
+  grep: /Merge PDF worker downloads native rotated pages with searchable text|Compress PDF shared worker creates downloadable valid PDF with native text|Merge PDF optional smart optimisation uses shared worker without changing pages/,
   timeout: 180_000,
   expect: { timeout: 90_000 },
   fullyParallel: false,
