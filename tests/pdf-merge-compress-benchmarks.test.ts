@@ -7,7 +7,7 @@ import { optimizeNativePdfImages } from "../lib/pdf/optimization/nativeImages.ts
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 
 const JPEG_BASE64 =
-  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=";
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=";
 const ORIGINAL_JPEG = new Uint8Array(Buffer.from(JPEG_BASE64, "base64"));
 
 function exactBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -62,7 +62,11 @@ async function makeMixedPages(withForm: boolean) {
 }
 
 async function extractAllText(bytes: ArrayBuffer): Promise<string> {
-  const task = pdfjsLib.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
+  // PDF.js may transfer/detach an ArrayBuffer when handing it to its worker.
+  // Always pass a defensive copy so benchmark outputBytes reflects the
+  // real serialized PDF instead of a post-transfer zero-byte buffer.
+  const originalSize = bytes.byteLength;
+  const task = pdfjsLib.getDocument({ data: new Uint8Array(bytes.slice(0)), useSystemFonts: true });
   const pdf = await task.promise;
   const pages: string[] = [];
   try {
@@ -70,6 +74,8 @@ async function extractAllText(bytes: ArrayBuffer): Promise<string> {
       const text = await (await pdf.getPage(i)).getTextContent();
       pages.push(text.items.map((item) => "str" in item ? item.str : "").join(" "));
     }
+    assert.equal(bytes.byteLength, originalSize,
+      "PDF.js text extraction must not detach the benchmark output buffer");
     return pages.join(" ");
   } finally {
     // PDF.js worker cleanup differs across Node versions; the benchmark
