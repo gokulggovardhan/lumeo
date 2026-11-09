@@ -163,11 +163,14 @@ jobs:
           npm run verify:production-freshness
           npx playwright test --config=playwright.phase11-production.config.ts
 
-      - name: Run live production conversion certification
-        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
-
+      # Certify the user-requested native PDF engines first. The broader
+      # conversion suite remains mandatory and can still fail the release,
+      # but must not prevent collection of Merge/Compress production evidence.
       - name: Certify live Merge PDF and Compress PDF native workers
         run: xvfb-run -a npx playwright test --config=playwright.production-pdf-engine.config.ts
+
+      - name: Run live production conversion certification
+        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
 
       - name: Recheck revision after live certification
         env:
