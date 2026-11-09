@@ -302,6 +302,35 @@ async function waitForL2UploadReady(page: Page) {
   return input;
 }
 
+async function selectWordForProductionSmoke(
+  page: Page,
+  input: { name: string; buffer: Buffer },
+): Promise<void> {
+  const fileInput = await waitForL2UploadReady(page);
+  const payload = {
+    name: input.name,
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer: input.buffer,
+  };
+  // The Word workspace exposes the chosen filename before the local Office
+  // runtime is ready. This proves React processed the file-input change.
+  const selectedName = page
+    .locator(".l2-workspace-deep span[title]")
+    .filter({ hasText: input.name })
+    .first();
+  await fileInput.setInputFiles(payload);
+  const observed = await expect(selectedName)
+    .toBeVisible({ timeout: 10_000 })
+    .then(() => true, () => false);
+  if (!observed) {
+    // Retry one dropped synthetic selection; never ignore a persistent failure.
+    await fileInput.setInputFiles([]);
+    await fileInput.setInputFiles(payload);
+  }
+  await expect(selectedName).toBeVisible({ timeout: 30_000 });
+}
+
 async function clickPersistentWorkspaceNav(
   page: Page,
   label: "Edit" | "Pages" | "Sign" | "Add" | "Compress" | "Finish",
@@ -609,10 +638,8 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
   const runtime = watchConversionRuntime(page);
 
   const docx = await makeDocx();
-  await (await waitForL2UploadReady(page)).setInputFiles({
+  await selectWordForProductionSmoke(page, {
     name: "production-smoke.docx",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: docx,
   });
 
