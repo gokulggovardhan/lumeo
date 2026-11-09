@@ -99,6 +99,12 @@ Main CodeQL Actions-language run [#2820](https://github.com/gokulggovardhan/lume
 
 This addendum preserves the original, time-qualified baseline while correcting its later observed production-certification state. It does not certify any pending PR or deployment.
 
+### Confirmed local Office-runtime 504 evidence and bounded correction
+
+The failed current-main conversion corpus ([run #710's Lumeo CI](https://github.com/gokulggovardhan/lumeo/actions/runs/42582766264)) reported 58 passed, 40 skipped, 2 failed. Inspection of its uploaded `workspace-release-conversion-report` Playwright traces—not merely the CI summary—found repeated local `HEAD /office-runtime/zeta-24-2-2026-09-21-a/soffice.js` responses of HTTP **504**, with the Word conversion lab displaying the actual recovery message that its local engine could not be loaded. A separate failing trace showed Office JS/WASM assets served HTTP 200 but subsequent Office startup dependencies did not complete; these are two observed paths, not proof of one universal cause.
+
+The Next.js `app/office-runtime/[release]/[asset]/route.ts` fetches pinned immutable assets from the existing GitHub release. Unlike the Cloudflare Worker fast path, this fallback originally made only **one** upstream attempt per incoming request. The Phase 0 branch now adds `lib/conversion/runtimeAssetUpstream.ts` with up to **three bounded retries** for transient 408/425/429/5xx or network errors, carrying the method, Range header, original cancellation signal and unbuffered response stream through unchanged. Non-transient errors and persistent outages continue to fail clearly. Six direct tests in `tests/conversion-office-runtime-upstream.test.ts` cover recovery, range/streaming, non-transient rejection, network failure, retry exhaustion and cancellation. This is **not** yet evidence of the actual Word converter passing in CI or production; it is a focused fix for the observed GitHub 504 availability path without changing PDF document privacy.
+
 ## Phase 0 acceptance gate
 
 Phase 0 is **not closed** in this snapshot. Close only after:
