@@ -60,7 +60,10 @@ export default function PdfToolsPage() {
         <p className="aura-text-label text-[var(--text-premium)]">
           PDF tools
         </p>
-        <h1 className="mt-2 font-serif text-[clamp(1.85rem,4vw,2.65rem)] font-semibold leading-tight tracking-[-0.025em] text-[var(--text-primary)]">
+        {/* The first-screen H1 is the measured mobile LCP element. Use the
+            existing system-sans token here so it paints without waiting for
+            the decorative Fraunces font; tool-card typography stays intact. */}
+        <h1 className="mt-2 font-sans text-[clamp(1.85rem,4vw,2.65rem)] font-semibold leading-tight tracking-[-0.025em] text-[var(--text-primary)]">
           All PDF tools in one place.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
