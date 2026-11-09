@@ -1,5 +1,6 @@
 import runtimeRelease from "@/config/office-runtime-release.json";
 import pinnedRuntimeManifest from "@/config/office-runtime-manifest.json";
+import { fetchRuntimeAssetWithRetry } from "@/lib/conversion/runtimeAssetUpstream";
 
 if (pinnedRuntimeManifest.releaseId !== runtimeRelease.releaseId) {
   throw new Error("Pinned Office manifest release ID does not match configured release.");
@@ -85,22 +86,17 @@ async function proxyRuntimeAsset(
   const range = request.headers.get("range");
   if (range) upstreamHeaders.set("Range", range);
 
-  // The public /office-runtime/... response is immutable, but the outgoing
-  // GitHub subrequest must bypass Cloudflare's fetch cache. Range probes and
-  // full runtime reads share the same source URL; force-caching those
-  // subrequests can let a cached partial body poison a later full WASM/data
-  // fetch. Browser/edge consumers still receive the immutable Cache-Control
-  // policy below.
-  const init: RequestInit = {
-    method: request.method === "HEAD" ? "HEAD" : "GET",
-    headers: upstreamHeaders,
-    redirect: "follow",
-    cache: "no-store",
-  };
-
+  // Keep the immutable browser cache policy, but bypass upstream cache and
+  // retry only transient GitHub release 408/425/429/5xx failures. This
+  // mirrors the production Worker fast path. Range and HEAD semantics stay
+  // intact, and no 100MB+ Office payload enters a memory buffer here.
   let upstream: Response;
   try {
-    upstream = await fetch(runtimeSourceUrl(runtimeAsset), init);
+    upstream = await fetchRuntimeAssetWithRetry(
+      request,
+      runtimeSourceUrl(runtimeAsset),
+      upstreamHeaders,
+    );
   } catch {
     return new Response("Office runtime is temporarily unavailable.", {
       status: 503,
