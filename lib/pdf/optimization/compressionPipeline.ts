@@ -68,7 +68,8 @@ export async function runNativeCompression(
           const candidate = await optimizeNativePdfImages(
             lossless.bytes, "smart", settings, transcodeJpegInWorker,
           );
-          return { bytes: candidate.bytes, outputBytes: candidate.outputBytes };
+          return { bytes: candidate.bytes, outputBytes: candidate.outputBytes,
+            fidelityScore: candidate.sampledFidelityScore };
         },
         onProgress: (completed, total) => onProgress?.(
           10 + Math.round((completed / Math.max(total, 1)) * 84),
