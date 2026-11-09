@@ -13,13 +13,19 @@ export type NativeOptimizationResult = {
   analyzedImages: number;
   applied: boolean;
   protectedReason?: string;
+  /** Worst accepted image candidate fidelity proxy when measured. */
+  sampledFidelityScore?: number;
 };
 
+export type NativeJpegTranscodeOutcome = {
+  bytes: Uint8Array;
+  sampledFidelityScore: number;
+};
 export type JpegTranscoder = (
   originalJpeg: Uint8Array,
   dimensions: { width: number; height: number; sourceWidth: number; sourceHeight: number },
   settings: NativeImageSettings,
-) => Promise<Uint8Array | null>;
+) => Promise<Uint8Array | NativeJpegTranscodeOutcome | null>;
 
 /** Keep the URL, forms, signatures, tagged structure and archival rules
  * exactly as provided rather than modifying document-wide relationships. */
@@ -142,6 +148,8 @@ export async function optimizeNativePdfImages(
 
   let completed = 0;
   let changed = 0;
+  let hasFullFidelityEvidence = true;
+  let lowestAcceptedFidelity = 1;
   const total = candidates.size;
   for (const candidate of candidates.values()) {
     const originalStream = pdf.context.lookup(candidate.ref);
@@ -181,10 +189,16 @@ export async function optimizeNativePdfImages(
     );
     if (!target) continue;
     try {
-      const nextBytes = await transcode(candidate.bytes, {
+      const transcodeResult = await transcode(candidate.bytes, {
         ...target, sourceWidth: width.asNumber(), sourceHeight: height.asNumber(),
       }, settings);
+      const nextBytes = transcodeResult instanceof Uint8Array
+        ? transcodeResult : transcodeResult?.bytes;
       if (!nextBytes || nextBytes.byteLength >= candidate.bytes.byteLength || nextBytes.byteLength < 32) continue;
+      const measuredScore = transcodeResult && !(transcodeResult instanceof Uint8Array)
+        ? transcodeResult.sampledFidelityScore : undefined;
+      if (measuredScore !== undefined &&
+          (!Number.isFinite(measuredScore) || measuredScore < 0 || measuredScore > 1)) continue;
       const image = await pdf.embedJpg(nextBytes);
       if (image.width !== target.width || image.height !== target.height) continue;
       await image.embed();
@@ -196,6 +210,11 @@ export async function optimizeNativePdfImages(
       pdf.context.assign(candidate.ref, replacement);
       pdf.context.delete(image.ref);
       changed += 1;
+      if (measuredScore === undefined) {
+        hasFullFidelityEvidence = false;
+      } else {
+        lowestAcceptedFidelity = Math.min(lowestAcceptedFidelity, measuredScore);
+      }
     } catch {
       // This image was unsupported by the browser decoder or yielded a bad
       // JPEG: keep its existing PDF stream intact rather than breaking output.
@@ -206,11 +225,13 @@ export async function optimizeNativePdfImages(
   }
 
   onProgress?.({ completed: total, total, stage: "validate" });
+  let selectedImagePass = false;
   if (changed > 0) {
     const output = await pdf.save({ useObjectStreams: true, addDefaultPage: false });
     if (output.byteLength < bestBytes.byteLength) {
       await validatePdfOutput(output, expectedPages);
       bestBytes = asArrayBuffer(output);
+      selectedImagePass = true;
     }
   }
   return {
@@ -218,7 +239,11 @@ export async function optimizeNativePdfImages(
     inputBytes: originalBytes.byteLength,
     outputBytes: bestBytes.byteLength,
     analyzedImages: total,
-    optimizedImages: changed,
+    // Only claim image optimisation when the image-bearing output actually
+    // won. A valid smaller lossless result can supersede a lossy candidate.
+    optimizedImages: selectedImagePass ? changed : 0,
+    sampledFidelityScore: selectedImagePass && hasFullFidelityEvidence
+      ? lowestAcceptedFidelity : undefined,
     applied: bestBytes.byteLength < originalBytes.byteLength,
   };
 }

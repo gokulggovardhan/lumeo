@@ -7,6 +7,10 @@ export type TargetAttempt = {
 export type TargetCandidate = {
   bytes: ArrayBuffer;
   outputBytes: number;
+  /** Measured and validated fidelity proxy (0..1), when available.
+   * Otherwise candidate ranking falls back to its conservative
+   * quality/DPI settings estimate. Never presented as an SSIM score. */
+  fidelityScore?: number;
 };
 
 export type TargetSearchOutcome = "achieved" | "closest-safe" | "no-benefit";
@@ -123,7 +127,12 @@ export async function searchNativePdfTarget(options: {
         candidate.outputBytes !== candidate.bytes.byteLength) {
       throw new Error("Invalid PDF candidate length returned by the optimiser.");
     }
-    const score = estimatedFidelity(settings);
+    if (candidate.fidelityScore !== undefined &&
+        (!Number.isFinite(candidate.fidelityScore) ||
+         candidate.fidelityScore < 0 || candidate.fidelityScore > 1)) {
+      throw new Error("Invalid measured PDF candidate fidelity.");
+    }
+    const score = candidate.fidelityScore ?? estimatedFidelity(settings);
     attempts.push({ ...settings, bytes: candidate.outputBytes, fidelityScore: score });
     if (preferTargetCandidate(
       { bytes: best.outputBytes, fidelityScore: best.fidelityScore },

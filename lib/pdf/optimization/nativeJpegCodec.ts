@@ -1,5 +1,5 @@
 import type { JpegTranscoder } from "./nativeImages.ts";
-import { measureSampledRgbFidelity, passesSampledJpegFidelity } from "./fidelity.ts";
+import { measureSampledRgbFidelity, passesSampledJpegFidelity, scoreSampledJpegCandidate } from "./fidelity.ts";
 
 /**
  * Local browser image re-encoder. Kept in the dedicated PDF worker:
@@ -20,7 +20,7 @@ export const transcodeJpegInWorker: JpegTranscoder = async (jpeg, dimensions, se
   let bitmap: ImageBitmap | null = null;
   let canvas: OffscreenCanvas | null = null;
   try {
-    bitmap = await createImageBitmap(blob);
+    bitmap = await createImageBitmap(blob, { imageOrientation: "none" });
     if (bitmap.width !== dimensions.sourceWidth || bitmap.height !== dimensions.sourceHeight) {
       // A hostile/malformed XObject's declared dimensions are not reliable.
       return null;
@@ -50,7 +50,7 @@ export const transcodeJpegInWorker: JpegTranscoder = async (jpeg, dimensions, se
     if (!sampleCtx) return null;
     sampleCtx.drawImage(canvas, 0, 0, sampleWidth, sampleHeight);
     const expected = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
-    const candidateBitmap = await createImageBitmap(encoded);
+    const candidateBitmap = await createImageBitmap(encoded, { imageOrientation: "none" });
     try {
       if (candidateBitmap.width !== dimensions.width ||
           candidateBitmap.height !== dimensions.height) return null;
@@ -59,7 +59,14 @@ export const transcodeJpegInWorker: JpegTranscoder = async (jpeg, dimensions, se
       const actual = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight).data;
       const evidence = measureSampledRgbFidelity(expected, actual);
       if (!passesSampledJpegFidelity(evidence, settings.quality)) return null;
-      return data;
+      // The candidate's ranking evidence is collected from real encoded
+      // pixels and downsampled dimensions, never the quality slider alone.
+      const sampledFidelityScore = scoreSampledJpegCandidate(
+        evidence,
+        { width: dimensions.sourceWidth, height: dimensions.sourceHeight },
+        { width: dimensions.width, height: dimensions.height },
+      );
+      return { bytes: data, sampledFidelityScore };
     } finally {
       candidateBitmap.close();
       sampleCanvas.width = 0;
