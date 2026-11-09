@@ -131,3 +131,20 @@ test("CMYK or custom color spaces are never implicitly converted into RGB JPEG",
   assert.equal(output.optimizedImages, 0);
   assert.equal((await PDFDocument.load(output.bytes)).getPageCount(), 2);
 });
+
+test("native optimizer surfaces sampled visual evidence only for the output that actually wins", async () => {
+  const input = await imageFixture();
+  const result = await optimizeNativePdfImages(
+    input, "smart", { dpi: 150, quality: 0.8 },
+    async () => ({ bytes: ORIGINAL_JPEG, sampledFidelityScore: 0.93 }),
+  );
+  assert.equal(result.applied, true);
+  assert.equal(result.optimizedImages, 1);
+  assert.equal(result.sampledFidelityScore, 0.93);
+  const noLossyGain = await optimizeNativePdfImages(
+    input, "smart", { dpi: 150, quality: 0.8 },
+    async (data) => ({ bytes: data, sampledFidelityScore: 0.6 }),
+  );
+  assert.equal(noLossyGain.optimizedImages, 0);
+  assert.equal(noLossyGain.sampledFidelityScore, undefined);
+});
