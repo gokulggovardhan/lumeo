@@ -53,6 +53,27 @@ npm run build:vinext
 
 Run the repository's full protected CI/browser gates as well. To validate the **deployed** revision separately, execute the workflow `.github/workflows/workspace-production-certification.yml`, which first matches `/api/build-info` to the candidate `main` SHA and then runs real Merge/Compress Playwright operations.
 
+## Confirmed engineering boundaries and remaining Phase 1–16 evidence
+
+These findings describe code already read from the pinned baseline. They do **not** start or certify any next phase.
+
+| Area | Existing implementation / safety rule | Unresolved acceptance evidence |
+| --- | --- | --- |
+| PDF graph analysis | `nativeImages.ts` re-parses PDF, enumerates indirect JPEG streams, and checks page/resource metadata. | Structural and resource-classification corpus still needs broader coverage (Phase 3). |
+| Native lossless mode | Object stream rewrite is accepted only if the final serialized file is smaller, and the candidate is parsed again. | Formal integrity tests beyond page count, including text operators, annotations and edge-case PDFs (Phases 4, 12). |
+| Lossy image coverage | Only canonical opaque 8-bit `/DeviceRGB` `/DCTDecode` JPEG XObjects are eligible. Other filters, masks, unusual dictionaries and ICC/CMYK profiles remain untouched. | Supported-format matrix, colour/metadata tests and a **representative real-image** corpus (Phases 5, 13). |
+| Fidelity guard | The worker checks a bounded 96×96 decoded image sample, computes PSNR/MAE and a separate fidelity proxy. | No proven whole-page readability/SSIM/PSNR benchmarks or fine-print/photo corpus; do not present sampled score as full visual certification (Phases 5, 13). |
+| Adaptive target | `adaptiveTarget.ts` runs bounded byte-measured candidates; may truthfully return `closest-safe` or `no-benefit`. | Real-document target hit rates, nonmonotonic-size stress tests, mobile memory bounds (Phases 6, 13). |
+| Merge input safeguards | `nativeMerge.ts` preserves native page content and source rotations, with a 128 MiB combined-file and 600-page cap. It refuses forms, signatures, bookmarks, annotations and other protected structures rather than silently stripping them. | Mixed PDF page boxes, Unicode/searchable text, safe handling of interactive documents, cross-browser output (Phases 7, 12). |
+| Compression limits | `nativeImages.ts` caps input at 80 MiB, pages at 600 and distinct JPEG references at 256. | Record these in UI and large-file tests; do not imply unlimited-device or big-scanned-document support (Phases 10, 11, 13). |
+| Output validation | `validatePdfOutput.ts` checks successful PDF load and exact page count; this alone cannot prove all bytes, text, visual layers or metadata survived. | Independent parsing, rendered comparison, security-malformation tests and regression corpus (Phases 12, 13). |
+| Browser isolation | Native compression uses a worker, `OffscreenCanvas` and `createImageBitmap` when available; unsupported browsers retain safe lossless/no-op handling. | Cancellation/memory measurement and cross-browser/mobile stability evidence (Phases 11, 13). |
+| UI and Workspace | Merge and Compress native tool components and Workspace continuation exist in current main. | Premium desktop/mobile quality, target-size interaction, accessibility and Workspace regression acceptance (Phases 8–10, 12). |
+| Open source / licenses | Current source imports `pdf-lib` and `pdfjs-dist`; no new paid service or remote document transport was introduced here. | Review precise installed versions, transitive licenses and legal distribution requirements before certification (Phase 1). |
+| Release evidence | Main SHA/Cloudflare deployment and route health are traceable; exact-production Merge/Compress browser run is not yet passing. | Required checks, all in-scope regressions, exact deployed SHA and completed real operations (Phases 14–16, and Phase 0 baseline gate). |
+
+Do not treat intentional fail-closed behavior as a silent feature success: if a user-supplied PDF has unsupported protected structure, neither a rewritten PDF nor a compression percentage should be claimed. Scope and quality upgrades must be supported by real output tests.
+
 ## CI and blocker disposition at inspection
 
 1. PR #693's `Core Workspace fidelity and build` and `Validate Lumeo PDF Workspace` passed. Its `Admin auth — Chromium + WebKit` job failed during `supabase start` on Inbucket's host port `54324` (already in use); this prevented Admin tests running. The same collision recurred in all three retries, so the retry loop alone is not a fix. Source: [job logs](https://github.com/gokulggovardhan/lumeo/actions/runs/42542616422/job/128920833058).
