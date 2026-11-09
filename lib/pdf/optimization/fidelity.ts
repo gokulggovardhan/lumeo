@@ -50,3 +50,32 @@ export function passesSampledJpegFidelity(
   return evidence.psnrDb >= minimumPsnr &&
     evidence.meanAbsoluteError <= maximumMae;
 }
+
+/**
+ * Conservative 0..1 ranking proxy combining sampled JPEG decoding error
+ * and independently measured retained resolution. It is NOT SSIM and does
+ * not certify semantic document quality. All candidates still have to pass
+ * the separate rejection thresholds and PDF structural checks first.
+ */
+export function scoreSampledJpegCandidate(
+  evidence: SampledFidelity,
+  original: { width: number; height: number },
+  output: { width: number; height: number },
+): number {
+  const dimensions = [original.width, original.height, output.width, output.height];
+  if (dimensions.some((value) => !Number.isSafeInteger(value) || value < 1) ||
+      !Number.isFinite(evidence.meanAbsoluteError) || evidence.meanAbsoluteError < 0 ||
+      Number.isNaN(evidence.psnrDb) || evidence.psnrDb < 0 ||
+      output.width > original.width || output.height > original.height) {
+    throw new Error("Invalid sampled JPEG fidelity evidence.");
+  }
+  const psnrRetention = evidence.psnrDb === Infinity
+    ? 1 : Math.max(0, Math.min(1, (evidence.psnrDb - 20) / 25));
+  const pixelRetention = Math.max(0, 1 - evidence.meanAbsoluteError / 30);
+  const resolutionRetention = Math.sqrt(
+    (output.width * output.height) / (original.width * original.height),
+  );
+  return Math.round(1000 * (
+    0.45 * psnrRetention + 0.25 * pixelRetention + 0.30 * resolutionRetention
+  )) / 1000;
+}
