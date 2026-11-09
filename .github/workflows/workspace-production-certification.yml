@@ -80,6 +80,7 @@ jobs:
             "/"
             "/pdf"
             "/pdf/edit"
+            "/pdf/merge"
             "/pdf/organize"
             "/pdf/sign"
             "/pdf/add"
@@ -164,6 +165,9 @@ jobs:
 
       - name: Run live production conversion certification
         run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
+
+      - name: Certify live Merge PDF and Compress PDF native workers
+        run: xvfb-run -a npx playwright test --config=playwright.production-pdf-engine.config.ts
 
       - name: Recheck revision after live certification
         env:
