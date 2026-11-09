@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { assertReviewedSupabaseSdkVersion } from "./verify-reviewed-supabase-sdk.mjs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -155,12 +156,7 @@ try {
   assert(packageJson.scripts["verify:aura"] === "node scripts/verify-lumeo-aura.mjs", "verify:aura script is missing.");
   assert(packageJson.dependencies.next === "^16.4.5", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
-  // A reviewed SDK upgrade must update both the explicit compatibility contract
-  // and the lockfile; do not silently widen or delete the protected version check.
-  const lock = JSON.parse(read("package-lock.json"));
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.119.0", "Supabase JS declared version changed unexpectedly.");
-  assert(lock.packages?.[""]?.dependencies?.["@supabase/supabase-js"] === "^2.119.0", "Supabase JS lockfile root dependency does not match the reviewed upgrade.");
-  assert(lock.packages?.["node_modules/@supabase/supabase-js"]?.version === "2.119.0", "Supabase JS installed lockfile version changed unexpectedly.");
+  assertReviewedSupabaseSdkVersion(packageJson);
 
   const newSource = [ui, workspace, read("components/layout/AuraPublicShell.tsx")].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(newSource), "Production debug logging must not be added.");

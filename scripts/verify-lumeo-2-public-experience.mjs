@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { assertReviewedSupabaseSdkVersion } from "./verify-reviewed-supabase-sdk.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -37,7 +38,7 @@ try {
   assert(packageJson.scripts["verify:lumeo2-public-experience"] === "node scripts/verify-lumeo-2-public-experience.mjs", "verify:lumeo2-public-experience script is missing.");
   assert(packageJson.dependencies.next === "^16.4.5", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.118.0", "Supabase JS version changed unexpectedly.");
+  assertReviewedSupabaseSdkVersion(packageJson);
 
   for (const component of [
     "L2PublicHeader",

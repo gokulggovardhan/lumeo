@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { assertReviewedSupabaseSdkVersion } from "./verify-reviewed-supabase-sdk.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -284,7 +285,7 @@ try {
   assert(packageJson.scripts["verify:lumeo2-foundation"] === "node scripts/verify-lumeo-2-foundation.mjs", "verify:lumeo2-foundation script is missing.");
   assert(packageJson.dependencies.next === "^16.4.5", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.118.0", "Supabase JS version changed unexpectedly.");
+  assertReviewedSupabaseSdkVersion(packageJson);
 
   const modified = changedFiles();
   for (const file of modified) {
