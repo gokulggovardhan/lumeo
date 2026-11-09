@@ -19,6 +19,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [["list"]],
+  // Retain conversion-certification artifacts from the preceding Playwright run.
+  outputDir: "test-results/production-pdf-engine",
   use: {
     baseURL: "https://lumeo.in",
     trace: "retain-on-failure",
