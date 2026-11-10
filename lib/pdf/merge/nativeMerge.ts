@@ -12,6 +12,7 @@ export type NativeMergeInput = { name: string; bytes: ArrayBuffer; rotation: num
 export type NativeMergeOptions = {
   format: NativeMergeFormat;
   marginPoints: number;
+  signal?: AbortSignal;
   onProgress?: (completedPages: number, totalPages: number) => void;
 };
 export type NativeMergeOutput = { bytes: ArrayBuffer; pageCount: number };
@@ -22,6 +23,10 @@ const A4_HEIGHT = 841.89;
 // before allowing a collection of independent 80 MB files to exhaust a phone.
 export const MAX_MERGE_INPUT_BYTES = 128 * 1024 * 1024;
 export const MAX_MERGE_PAGES = 600;
+
+function assertMergeActive(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException("Merge cancelled.", "AbortError");
+}
 
 function requireLegalRotation(value: number): 0 | 90 | 180 | 270 {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value % 90 !== 0) {
@@ -103,6 +108,7 @@ export async function mergeNativeDocuments(
   options: NativeMergeOptions,
 ): Promise<NativeMergeOutput> {
   if (inputs.length < 2) throw new Error("Select at least two PDF files.");
+  assertMergeActive(options.signal);
   const inputSize = inputs.reduce((sum, item) => sum + item.bytes.byteLength, 0);
   if (inputSize > MAX_MERGE_INPUT_BYTES) {
     throw new Error("These files exceed this device-safe merge size. Merge fewer files at once.");
@@ -114,7 +120,9 @@ export async function mergeNativeDocuments(
   const sources: Array<{ source: PDFDocument; rotation: 0 | 90 | 180 | 270 }> = [];
   let totalPages = 0;
   for (const input of inputs) {
+    assertMergeActive(options.signal);
     const source = await PDFDocument.load(input.bytes, { ignoreEncryption: false });
+    assertMergeActive(options.signal);
     if (source.getPageCount() === 0) throw new Error("An input PDF has no pages.");
     assertSafeToMerge(source);
     totalPages += source.getPageCount();
@@ -142,11 +150,13 @@ export async function mergeNativeDocuments(
   let completedPages = 0;
 
   for (const { source, rotation } of sources) {
+    assertMergeActive(options.signal);
     if (options.format === "original") {
       // Native /Rotate retains page content, fonts, searchable text and page
       // boxes. No full-page JPEG rasterisation, even at 90/180/270 degrees.
       const pages = await merged.copyPages(source, source.getPageIndices());
       for (const page of pages) {
+        assertMergeActive(options.signal);
         const existing = requireLegalRotation(page.getRotation().angle);
         page.setRotation(degrees(normalizeRotation(existing + rotation)));
         merged.addPage(page);
@@ -157,6 +167,7 @@ export async function mergeNativeDocuments(
     }
 
     for (const sourcePage of source.getPages()) {
+      assertMergeActive(options.signal);
       const sourceRotation = requireLegalRotation(sourcePage.getRotation().angle);
       const crop = sourcePage.getCropBox();
       const placement = nativePagePlacement({
@@ -190,9 +201,12 @@ export async function mergeNativeDocuments(
     }
   }
 
+  assertMergeActive(options.signal);
   const result = await merged.save({ useObjectStreams: true });
+  assertMergeActive(options.signal);
   if (!result.byteLength) throw new Error("The merged PDF is empty.");
   await validatePdfOutput(result, totalPages);
+  assertMergeActive(options.signal);
   return {
     bytes: result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength) as ArrayBuffer,
     pageCount: totalPages,
