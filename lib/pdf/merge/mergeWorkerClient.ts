@@ -17,7 +17,9 @@ export function mergePdfInBackground(
   if (typeof Worker === "undefined") {
     // Supported fallback for older browsers. Native merging remains intact,
     // although the interface may be less responsive during a large merge.
-    return mergeNativeDocuments(inputs, { ...options, onProgress });
+    // Worker-less browsers cannot preempt a synchronous PDF operation, but
+    // must honour cancellation before, between and after asynchronous stages.
+    return mergeNativeDocuments(inputs, { ...options, signal, onProgress });
   }
 
   return new Promise<NativeMergeOutput>((resolve, reject) => {
