@@ -4,6 +4,8 @@ Lumeo PDF Workspace is a premium browser-first PDF workspace designed for privat
 
 Live website: https://lumeo.in
 
+**Permanent development and deployment instructions:** see [manifest.md](./manifest.md). This README remains product/architecture documentation, not a second development policy.
+
 ## Product vision
 
 Lumeo PDF is being built as a calm, serious, premium document workspace. The product direction is simple first, powerful when needed, and premium always.
