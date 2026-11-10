@@ -103,6 +103,41 @@ test("native merger rejects invalid inputs without generating a downloadable PDF
   ], { format: "original", marginPoints: 0 }), /unsupported rotation/);
 });
 
+test("native merge honours cancellation before loading and after per-page progress", async () => {
+  const first = await fixture("STOP AFTER FIRST PAGE");
+  const second = await fixture("NEVER PUBLISH SECOND PAGE");
+  const inputs = [
+    { name: "first.pdf", bytes: first, rotation: 0 },
+    { name: "second.pdf", bytes: second, rotation: 0 },
+  ];
+
+  const preCancelled = new AbortController();
+  preCancelled.abort();
+  await assert.rejects(
+    mergeNativeDocuments(inputs, {
+      format: "original", marginPoints: 0, signal: preCancelled.signal,
+    }),
+    { name: "AbortError", message: "Merge cancelled." },
+  );
+  assert.equal(first.byteLength > 0, true, "Cancellation must not detach the source bytes");
+
+  const duringMerge = new AbortController();
+  const completedPages: number[] = [];
+  await assert.rejects(
+    mergeNativeDocuments(inputs, {
+      format: "original",
+      marginPoints: 0,
+      signal: duringMerge.signal,
+      onProgress: (completed) => {
+        completedPages.push(completed);
+        if (completed === 1) duringMerge.abort();
+      },
+    }),
+    { name: "AbortError", message: "Merge cancelled." },
+  );
+  assert.deepEqual(completedPages, [1], "No subsequent output page may be published after cancellation");
+});
+
 test("match-first layout follows the first page's actual displayed rotation", async () => {
   const first = await fixture("ROTATED SOURCE", 90, 400, 600);
   const second = await fixture("NEXT SOURCE", 0, 500, 800);
