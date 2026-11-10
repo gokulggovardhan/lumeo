@@ -1,6 +1,6 @@
 # Keeps graphify-out/ current without anyone having to remember.
 #
-# CLAUDE.md instructs every reader -- human and agent -- to consult the graph
+# manifest.md instructs project developers and agents to consult the graph
 # BEFORE reading source. That makes it load-bearing documentation, and it was
 # being refreshed by hand: last rebuild 2026-08-11, five days and four merged
 # PRs behind by the time anyone noticed. The staleness was the symptom; the
