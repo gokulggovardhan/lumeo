@@ -48,6 +48,12 @@ export function mergePdfInBackground(
       if (finish()) reject(new Error("Merge processing timed out. Try fewer files or a smaller document."));
     }, 240_000);
     signal.addEventListener("abort", cancel, { once: true });
+    // Abort may have happened while the Worker constructor was running,
+    // before the event listener was registered. AbortSignal does not replay.
+    if (signal.aborted) {
+      cancel();
+      return;
+    }
     worker.onerror = () => {
       if (finish()) reject(new Error("The PDF merge worker stopped unexpectedly. Try a smaller merge."));
     };
