@@ -1,4 +1,5 @@
-import { degrees, PDFDocument, PDFName, rgb } from "pdf-lib";
+import { degrees, PDFDocument, rgb } from "pdf-lib";
+import { inspectPdfStructure } from "../structuralEligibility.ts";
 import { normalizeRotation } from "../rotation.ts";
 import { validatePdfOutput } from "../optimization/validateOutput.ts";
 
@@ -42,17 +43,19 @@ function requireLegalRotation(value: number): 0 | 90 | 180 | 270 {
  * inputs explicitly instead of silently returning a damaged interactive PDF.
  */
 function assertSafeToMerge(source: PDFDocument): void {
-  for (const feature of ["Perms", "AcroForm", "Outlines", "Names", "AF", "StructTreeRoot", "OutputIntents"] as const) {
-    if (source.catalog.has(PDFName.of(feature))) {
-      throw new Error("This PDF has protected or interactive document structure that cannot be merged safely in this mode. Keep the original file.");
-    }
+  const eligibility = inspectPdfStructure(source);
+  if (eligibility.safeForMerge) return;
+  if (eligibility.protectedFeatures.length > 0) {
+    throw new Error(
+      "This PDF has protected or interactive document structure that cannot be merged safely in this mode. Keep the original file.",
+    );
   }
-  for (const page of source.getPages()) {
-    const annots = page.node.Annots();
-    if (annots && annots.size() > 0) {
-      throw new Error("This PDF has links, annotations or form controls that cannot be merged safely in this mode. Keep the original file.");
-    }
-  }
+  // The structural preflight intentionally exposes no PDF content or
+  // filenames in the failure message. Malformed pages, resource references
+  // or unknown XObject programs are not guessed past.
+  throw new Error(
+    "This PDF contains unsupported page geometry or PDF resources. Keep the original file rather than risking document integrity.",
+  );
 }
 
 /** Layout math is pure and can be tested independently of the browser. */
