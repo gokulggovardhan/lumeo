@@ -58,6 +58,7 @@ test("only unequivocal transient setup failures may receive one bounded retry", 
   assert.equal(eligibleRetry({ pr, run, job, log: transientLog }), true);
   assert.equal(eligibleRetry({ pr, run, job, log: "AssertionError: expected 2 to equal 3" }), false);
   assert.equal(eligibleRetry({ pr, run: { ...run, run_attempt: 2 }, job, log: transientLog }), false);
+  assert.equal(eligibleRetry({ pr, run: { ...run, run_attempt: undefined }, job, log: transientLog }), false);
   assert.equal(eligibleRetry({ pr, run: { ...run, status: "in_progress" }, job, log: transientLog }), false);
   assert.equal(eligibleRetry({ pr, run: { ...run, conclusion: "cancelled" }, job, log: transientLog }), false);
   assert.equal(eligibleRetry({ pr, run: { ...run, head_sha: "wrong" }, job, log: transientLog }), false);
