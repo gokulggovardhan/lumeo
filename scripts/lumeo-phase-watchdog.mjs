@@ -132,13 +132,13 @@ async function main() {
     // Unreachable production is a reportable blocker, never a reason to deploy.
   }
 
-  const openPrs = await gh("/repos/" + REPO + "/pulls?state=open&base=main&per_page=100");
+  const openPrs = await gh("/repos/" + REPO + "/pulls?state=open&per_page=100");
   const activePrs = (openPrs ?? []).filter((pr) => phasePrMatches(pr, activePhase));
   const trackedPrs = [];
   const openPrChecks = [];
   const actions = [];
   const anomalies = [];
-  // The watchdog reports ALL open same-repository PR required checks, but
+  // The watchdog reports ALL open PRs (including stacked/fork PRs), but
   // may recover jobs only on the active phase's own implementation PR.
   for (const pr of (openPrs ?? []).slice(0, 30)) {
     // Fork heads may not exist in the base repository's commit namespace.
