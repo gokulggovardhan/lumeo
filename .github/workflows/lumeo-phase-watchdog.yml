@@ -56,6 +56,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      checks: read
       issues: write
       pull-requests: read
     steps:
