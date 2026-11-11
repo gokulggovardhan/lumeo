@@ -3042,6 +3042,13 @@ export default function EditPdfTool({ initialFile = null }: { initialFile?: File
     return () => observer.disconnect();
   }, [pageImageUrl]);
 
+  // Phase 2 production regression: never run native matching/fallback
+  // before PDF.js text detection has genuinely settled for these exact bytes
+  // and page. Previously the empty initial detectedTextRuns state could be
+  // mistaken for a completed zero-run extraction. This raced the asynchronous
+  // getTextContent() result and allowed a native-only, read-only fallback
+  // to overwrite the independent PDF.js evidence after edit/export/reopen.
+  // Keep the fail-closed native fallback for a *completed* zero-run result.
   // Phase 9.1: matches each run the effect above detected to its
   // content-stream operator (lib/pdf/edit/matchTextRun.ts), so the select
   // tool can show which runs are actually editable. Split into its own
@@ -3055,6 +3062,7 @@ export default function EditPdfTool({ initialFile = null }: { initialFile?: File
     if (
       !pdf ||
       !pdfJsDocRef.current ||
+      !textDetectionCurrent ||
       !pdfLibDoc ||
       !editEngine ||
       !pagePointSize ||
@@ -3267,7 +3275,7 @@ export default function EditPdfTool({ initialFile = null }: { initialFile?: File
     // on the raster size would re-run this whole match (and reset every
     // RunMatch the UI relies on) on every future zoom-driven re-render, for
     // a result that is by construction identical.
-  }, [pdf, pdfLibDoc, editEngine, pageIndex, detectedTextRuns, pagePointSize, fontRegistry]);
+  }, [pdf, pdfLibDoc, editEngine, pageIndex, detectedTextRuns, textDetectionCurrent, pagePointSize, fontRegistry]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
