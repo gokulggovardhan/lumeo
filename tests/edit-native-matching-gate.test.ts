@@ -5,9 +5,9 @@ import { readFileSync } from "node:fs";
 test("native PDF matching cannot publish an early fallback before PDF.js detection has finished", () => {
   const source = readFileSync("components/pdf/EditPdfTool.tsx", "utf8");
   const start = source.indexOf("// Phase 9.1: matches each run the effect above detected");
-  const end = source.indexOf("// Keyed on pagePointSize, NOT pageDisplaySize", start);
-  assert.ok(start >= 0 && end > start, "Expected active native match effect and ownership comment");
-  const effect = source.slice(start, end);
+  const dependencies = source.indexOf("  }, [pdf, pdfLibDoc, editEngine", start);
+  assert.ok(start >= 0 && dependencies > start, "Expected active native match effect and dependency list");
+  const effect = source.slice(start, dependencies + 220);
 
   assert.match(
     effect,
