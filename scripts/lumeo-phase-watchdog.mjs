@@ -45,7 +45,7 @@ export function eligibleRetry({ run, job, pr, log }) {
   if (!pr || pr.draft || pr.state !== "open" || pr.head?.repo?.full_name !== REPO) return false;
   if (!run || run.event !== "pull_request" || run.name !== "Lumeo CI" ||
       run.head_sha !== pr.head.sha || run.status !== "completed" ||
-      run.conclusion !== "failure" || run.run_attempt > MAX_AUTO_RETRIES) return false;
+      run.conclusion !== "failure" || run.run_attempt !== MAX_AUTO_RETRIES) return false;
   if (!job || job.status !== "completed" || job.conclusion !== "failure") return false;
   // A failed browser test, assertion, lint, security or application step is
   // NEVER automatically retried, even if its log contains a network warning.
@@ -179,7 +179,7 @@ async function main() {
   function eligiblePr(pr, run) {
     return pr.state === "open" && !pr.draft && pr.head?.repo?.full_name === REPO &&
       run.status === "completed" && run.conclusion === "failure" &&
-      run.run_attempt <= MAX_AUTO_RETRIES && run.head_sha === pr.head.sha;
+      run.run_attempt === MAX_AUTO_RETRIES && run.head_sha === pr.head.sha;
   }
 
   if (!allComplete && activePrs.length === 0) {
