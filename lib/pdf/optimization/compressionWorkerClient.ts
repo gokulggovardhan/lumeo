@@ -47,6 +47,12 @@ export function compressPdfInBackground(
       if (finish()) reject(new Error("Compression exceeded the safe browser processing time."));
     }, 240_000);
     signal.addEventListener("abort", cancel, { once: true });
+    // Abort may have happened while the Worker constructor was running,
+    // before the event listener was registered. AbortSignal does not replay.
+    if (signal.aborted) {
+      cancel();
+      return;
+    }
     worker.onerror = () => {
       if (finish()) reject(new Error("The local compression engine stopped unexpectedly."));
     };

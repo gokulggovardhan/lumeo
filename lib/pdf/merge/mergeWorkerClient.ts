@@ -17,7 +17,9 @@ export function mergePdfInBackground(
   if (typeof Worker === "undefined") {
     // Supported fallback for older browsers. Native merging remains intact,
     // although the interface may be less responsive during a large merge.
-    return mergeNativeDocuments(inputs, { ...options, onProgress });
+    // Worker-less browsers cannot preempt a synchronous PDF operation, but
+    // must honour cancellation before, between and after asynchronous stages.
+    return mergeNativeDocuments(inputs, { ...options, signal, onProgress });
   }
 
   return new Promise<NativeMergeOutput>((resolve, reject) => {
@@ -46,6 +48,12 @@ export function mergePdfInBackground(
       if (finish()) reject(new Error("Merge processing timed out. Try fewer files or a smaller document."));
     }, 240_000);
     signal.addEventListener("abort", cancel, { once: true });
+    // Abort may have happened while the Worker constructor was running,
+    // before the event listener was registered. AbortSignal does not replay.
+    if (signal.aborted) {
+      cancel();
+      return;
+    }
     worker.onerror = () => {
       if (finish()) reject(new Error("The PDF merge worker stopped unexpectedly. Try a smaller merge."));
     };

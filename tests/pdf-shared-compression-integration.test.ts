@@ -40,4 +40,9 @@ test("both tools expose actual background progress and allow cancellation", () =
   assert.match(compress, /compressionAbortRef\.current\?\.abort\(\)/);
   assert.match(client, /worker\.terminate\(\)/);
   assert.match(client, /AbortError/);
+  const mergeClient = readFileSync("lib/pdf/merge/mergeWorkerClient.ts", "utf8");
+  const nativeMerge = readFileSync("lib/pdf/merge/nativeMerge.ts", "utf8");
+  assert.match(mergeClient, /mergeNativeDocuments\(inputs, \{ \.\.\.options, signal, onProgress \}\)/);
+  assert.match(nativeMerge, /assertMergeActive\(options\.signal\)/);
 });
+
