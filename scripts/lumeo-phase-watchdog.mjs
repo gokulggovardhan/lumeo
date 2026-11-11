@@ -197,6 +197,14 @@ async function main() {
       try { log = await gh("/repos/" + REPO + "/actions/jobs/" + job.id + "/logs", { raw: true }); }
       catch { anomalies.push("Job " + job.id + " log unavailable; no retry."); continue; }
       if (!eligibleRetry({ run: candidate, job, pr, log: log.slice(-1_000_000) })) continue;
+      // Never retry a stale run after the PR was merged, closed or updated
+      // while this watchdog was reading CI results.
+      const latestPr = await gh("/repos/" + REPO + "/pulls/" + pr.number);
+      if (latestPr.state !== "open" || latestPr.head?.sha !== pr.head.sha ||
+          !phasePrMatches(latestPr, activePhase)) {
+        anomalies.push("PR #" + pr.number + " changed during inspection; retry cancelled.");
+        continue;
+      }
       await gh("/repos/" + REPO + "/actions/jobs/" + job.id + "/rerun", { method: "POST" });
       actions.push("Retried verified transient setup job " + job.id + " once on PR #" + pr.number + ", CI run " + candidate.id);
       break;
