@@ -1,0 +1,73 @@
+name: Lumeo Phase Watchdog (30 min)
+
+on:
+  schedule:
+    # Twice per hour, UTC. GitHub scheduled starts may be delayed.
+    - cron: "7,37 * * * *"
+  # An exact first activation on protected main when this implementation
+  # merges. Future scheduled runs remain the continuous monitor.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/lumeo-phase-watchdog.yml"
+      - "scripts/lumeo-phase-watchdog.mjs"
+      - "tests/lumeo-phase-watchdog.test.mjs"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Read-only inspection: do not retry jobs or write issue comments"
+        type: boolean
+        required: false
+        default: true
+  pull_request:
+    paths:
+      - ".github/workflows/lumeo-phase-watchdog.yml"
+      - "scripts/lumeo-phase-watchdog.mjs"
+      - "tests/lumeo-phase-watchdog.test.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumeo-phase-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog-tests:
+    name: Verify watchdog safety policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+      - name: Validate watchdog gate tests
+        run: node --test tests/lumeo-phase-watchdog.test.mjs
+
+  monitor:
+    name: Inspect phases, CI and deployed SHA
+    needs: watchdog-tests
+    if: ${{ github.repository == 'gokulggovardhan/lumeo' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: write
+      checks: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout protected main source
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+      - name: Inspect, report and recover only proven transient setup failures
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WATCHDOG_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: node scripts/lumeo-phase-watchdog.mjs
