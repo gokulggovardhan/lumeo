@@ -4,6 +4,14 @@ on:
   schedule:
     # Twice per hour, UTC. GitHub scheduled starts may be delayed.
     - cron: "7,37 * * * *"
+  # An exact first activation on protected main when this implementation
+  # merges. Future scheduled runs remain the continuous monitor.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/lumeo-phase-watchdog.yml"
+      - "scripts/lumeo-phase-watchdog.mjs"
+      - "tests/lumeo-phase-watchdog.test.mjs"
   workflow_dispatch:
     inputs:
       dry_run:
