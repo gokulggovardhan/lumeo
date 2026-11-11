@@ -141,11 +141,22 @@ async function main() {
   // The watchdog reports ALL open same-repository PR required checks, but
   // may recover jobs only on the active phase's own implementation PR.
   for (const pr of (openPrs ?? []).slice(0, 30)) {
-    const prCheckData = await gh("/repos/" + REPO + "/commits/" + pr.head.sha + "/check-runs?per_page=100");
-    const prRequired = (prCheckData.check_runs ?? []).find((entry) => entry.name === "Validate Lumeo PDF Workspace");
+    // Fork heads may not exist in the base repository's commit namespace.
+    // Their checks are reported as external instead of aborting monitoring.
+    let checkState = "external fork";
+    if (pr.head?.repo?.full_name === REPO) {
+      try {
+        const prCheckData = await gh("/repos/" + REPO + "/commits/" + pr.head.sha + "/check-runs?per_page=100");
+        const prRequired = (prCheckData.check_runs ?? []).find((entry) => entry.name === "Validate Lumeo PDF Workspace");
+        checkState = prRequired?.conclusion ?? prRequired?.status ?? "missing";
+      } catch {
+        checkState = "unavailable";
+        anomalies.push("Open PR #" + pr.number + " checks temporarily unavailable");
+      }
+    }
     const result = {
       number: pr.number, sha: pr.head.sha, draft: pr.draft,
-      requiredCheck: prRequired?.conclusion ?? prRequired?.status ?? "missing",
+      requiredCheck: checkState,
       activePhase: phasePrMatches(pr, activePhase),
     };
     openPrChecks.push(result);
