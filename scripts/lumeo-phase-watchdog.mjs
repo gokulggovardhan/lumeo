@@ -135,8 +135,24 @@ async function main() {
   const openPrs = await gh("/repos/" + REPO + "/pulls?state=open&base=main&per_page=100");
   const activePrs = (openPrs ?? []).filter((pr) => phasePrMatches(pr, activePhase));
   const trackedPrs = [];
+  const openPrChecks = [];
   const actions = [];
   const anomalies = [];
+  // The watchdog reports ALL open same-repository PR required checks, but
+  // may recover jobs only on the active phase's own implementation PR.
+  for (const pr of (openPrs ?? []).slice(0, 30)) {
+    const prCheckData = await gh("/repos/" + REPO + "/commits/" + pr.head.sha + "/check-runs?per_page=100");
+    const prRequired = (prCheckData.check_runs ?? []).find((entry) => entry.name === "Validate Lumeo PDF Workspace");
+    const result = {
+      number: pr.number, sha: pr.head.sha, draft: pr.draft,
+      requiredCheck: prRequired?.conclusion ?? prRequired?.status ?? "missing",
+      activePhase: phasePrMatches(pr, activePhase),
+    };
+    openPrChecks.push(result);
+    if (["failure", "cancelled", "timed_out"].includes(result.requiredCheck)) {
+      anomalies.push("Open PR #" + pr.number + " required validation " + result.requiredCheck);
+    }
+  }
   const stalledRuns = mainWorkflows.filter((run) => run.stalled);
   if (stalledRuns.length) anomalies.push("Main workflows possibly stalled: " + stalledRuns.map((r) => r.id).join(", "));
   for (const run of mainWorkflows) {
@@ -191,7 +207,7 @@ async function main() {
 
   const snapshot = {
     activePhase, phaseStatus: activePhase === null ? "COMPLETED" : phases.get(activePhase),
-    mainSha, requiredCheck, production, mainWorkflows, trackedPrs, anomalies,
+    mainSha, requiredCheck, production, mainWorkflows, trackedPrs, openPrChecks, anomalies,
     // A retry is a material state transition, but ordinary checks shouldn't
     // generate a new issue comment every half hour.
     actions: actions.filter((item) => !item.startsWith("Dry run")),
@@ -204,6 +220,7 @@ async function main() {
     "Main: " + mainSha,
     "Required check: " + requiredCheck.status + "/" + (requiredCheck.conclusion ?? "pending"),
     "Production build-info: " + (production.reachable ? (production.exactSha ? "exact main SHA" : "SHA mismatch or older deployment") : "unreachable"),
+    "Open PR required checks: " + (openPrChecks.map((item) => "#" + item.number + "=" + item.requiredCheck + (item.activePhase ? " (active phase)" : "")).join("; ") || "none"),
     "Open active-phase PRs: " + (trackedPrs.map((item) => "#" + item.number + " (" + (item.ci?.conclusion ?? item.ci?.status ?? "no CI") + ")").join(", ") || "none"),
     "Main workflows: " + mainWorkflows.map((r) => r.name + "=" + (r.conclusion ?? r.status)).join("; "),
     "Anomalies: " + (anomalies.join("; ") || "none detected"),
