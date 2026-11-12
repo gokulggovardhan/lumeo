@@ -10,7 +10,7 @@ import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 import { findEmbeddedJpegs } from "../lib/pdf/embeddedImages.ts";
 
 const JPEG = Buffer.from(
-  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
   "base64",
 );
 
@@ -36,8 +36,8 @@ async function jpgFixture() {
 test("Phase 3: simple text pages expose actual boxes, rotations and fonts without private text content", async () => {
   const doc = await nativeFixture();
   const report = inspectPdfStructure(doc);
-  assert.equal(report.safeForMerge, true);
-  assert.equal(report.safeForCompression, true);
+  assert.equal(report.safeForMerge, true, JSON.stringify(report));
+  assert.equal(report.safeForCompression, true, JSON.stringify(report));
   assert.equal(report.pages.length, 1);
   assert.deepEqual(report.pages[0].mediaBox, { x: 0, y: 0, width: 410, height: 600 });
   assert.deepEqual(report.pages[0].cropBox, { x: 20, y: 30, width: 300, height: 400 });
@@ -126,7 +126,7 @@ test("Phase 3: actual serialized native Merge and Compress maintain output parse
   const parsed = await PDFDocument.load(merged.bytes);
   assert.equal(parsed.getPageCount(), 2);
   const outputReport = inspectPdfStructure(parsed);
-  assert.equal(outputReport.safeForMerge, true);
+  assert.equal(outputReport.safeForMerge, true, JSON.stringify(outputReport));
   assert.deepEqual(outputReport.pages.map((page) => page.rotation), [90, 90]);
   const compressed = await optimizeNativePdfImages(merged.bytes, "lossless", { dpi: 150, quality: 0.8 });
   assert.ok(compressed.outputBytes <= merged.bytes.byteLength);
