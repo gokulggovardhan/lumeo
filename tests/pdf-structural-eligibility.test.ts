@@ -9,10 +9,12 @@ import { optimizeNativePdfImages } from "../lib/pdf/optimization/nativeImages.ts
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 import { findEmbeddedJpegs } from "../lib/pdf/embeddedImages.ts";
 
-const JPEG = Buffer.from(
+// Normalize Node Buffer's pooled byteOffset: pdf-lib's JPEG decoder reads
+// from the backing ArrayBuffer origin, so a slab-backed Buffer is unsafe.
+const JPEG = new Uint8Array(Buffer.from(
   "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
   "base64",
-);
+));
 
 function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
