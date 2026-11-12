@@ -170,8 +170,8 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
       const fonts = asDict(fontValue, context);
       if (!fonts) unsafe.add("PDF font resource dictionary could not be resolved.");
       else {
-        page.fontResources += fonts.size();
-        totalFontResources += fonts.size();
+        page.fontResources += fonts.keys().length;
+        totalFontResources += fonts.keys().length;
         for (const [, entry] of fonts.entries()) {
           if (!asDict(entry, context)) unsafe.add("A PDF font resource reference is malformed.");
         }
