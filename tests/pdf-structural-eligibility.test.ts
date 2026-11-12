@@ -34,7 +34,7 @@ async function jpgFixture() {
 }
 
 test("Phase 3: simple text pages expose actual boxes, rotations and fonts without private text content", async () => {
-  const doc = await nativeFixture();
+  const doc = await PDFDocument.load(await (await nativeFixture()).save());
   const report = inspectPdfStructure(doc);
   assert.equal(report.safeForMerge, true, JSON.stringify(report));
   assert.equal(report.safeForCompression, true, JSON.stringify(report));
@@ -49,7 +49,7 @@ test("Phase 3: simple text pages expose actual boxes, rotations and fonts withou
 });
 
 test("Phase 3: only canonical 8-bit RGB DCT JPEG may enter lossy browser transcode", async () => {
-  const pdf = await jpgFixture();
+  const pdf = await PDFDocument.load(await (await jpgFixture()).save());
   const report = inspectPdfStructure(pdf);
   assert.equal(report.safeForCompression, true);
   assert.equal(report.images.length, 1);
@@ -76,12 +76,12 @@ test("Phase 3: only canonical 8-bit RGB DCT JPEG may enter lossy browser transco
 test("Phase 3: AcroForms and action-bearing catalogs cannot be modified or merged", async () => {
   const doc = await nativeFixture();
   doc.getForm().createTextField("customer").addToPage(doc.getPage(0));
-  const report = inspectPdfStructure(doc);
+  const original = arrayBuffer(await doc.save());
+  const report = inspectPdfStructure(await PDFDocument.load(original));
   assert.equal(report.safeForMerge, false);
   assert.equal(report.safeForCompression, false);
   assert.ok(report.protectedFeatures.includes("AcroForm"));
   assert.ok(report.protectedFeatures.includes("PageAnnotations"));
-  const original = arrayBuffer(await doc.save());
   const compressed = await optimizeNativePdfImages(original, "maximum", { dpi: 120, quality: 0.6 });
   assert.equal(compressed.applied, false);
   assert.equal(compressed.outputBytes, original.byteLength);
@@ -100,7 +100,7 @@ test("Phase 3: AcroForms and action-bearing catalogs cannot be modified or merge
 });
 
 test("Phase 3: malformed indirect resources and invalid page rotation fail closed", async () => {
-  const doc = await nativeFixture();
+  const doc = await PDFDocument.load(await (await nativeFixture()).save());
   const page = doc.getPage(0);
   const resources = page.node.Resources();
   assert.ok(resources);
