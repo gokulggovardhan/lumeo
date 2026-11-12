@@ -1,6 +1,7 @@
 import { PDFDocument, PDFName, PDFNumber, PDFRawStream } from "pdf-lib";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "../embeddedImages.ts";
 import { validatePdfOutput } from "./validateOutput.ts";
+import { inspectPdfStructure, isCanonicalRgbJpegResource } from "../structuralEligibility.ts";
 
 export type NativeOptimizationMode = "lossless" | "smart" | "maximum";
 export type NativeImageSettings = { dpi: number; quality: number };
@@ -30,21 +31,11 @@ export type JpegTranscoder = (
 /** Keep the URL, forms, signatures, tagged structure and archival rules
  * exactly as provided rather than modifying document-wide relationships. */
 function protectStructure(pdf: PDFDocument): string | null {
-  const protectedCatalogFields = [
-    "Perms", "AcroForm", "Outlines", "Names", "AF", "StructTreeRoot", "OutputIntents",
-  ] as const;
-  for (const entry of protectedCatalogFields) {
-    if (pdf.catalog.has(PDFName.of(entry))) {
-      return "This PDF contains protected, interactive, navigational or archival structures; the original is retained.";
-    }
-  }
-  if (pdf.getPages().some((page) => {
-    const annots = page.node.Annots();
-    return Boolean(annots && annots.size() > 0);
-  })) {
-    return "This PDF contains links, forms or annotations; the original is retained.";
-  }
-  return null;
+  const inspection = inspectPdfStructure(pdf);
+  if (inspection.safeForCompression) return null;
+  return inspection.protectedFeatures.length
+    ? "This PDF contains protected, interactive, navigational or archival structures; the original is retained."
+    : "This PDF contains unsupported page geometry or resource structures; the original is retained.";
 }
 
 function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -154,28 +145,10 @@ export async function optimizeNativePdfImages(
   for (const candidate of candidates.values()) {
     const originalStream = pdf.context.lookup(candidate.ref);
     if (!(originalStream instanceof PDFRawStream)) continue;
-    // Browser canvas re-encoding does not preserve specialised XObject
-    // semantics such as Decode remapping, Interpolate flags, Metadata,
-    // image alternates or optional content groups. Only canonical, opaque
-    // baseline JPEG dictionaries are eligible for replacement.
-    const allowedImageFields = new Set([
-      "Type", "Subtype", "Width", "Height", "ColorSpace",
-      "BitsPerComponent", "Length", "Filter",
-    ]);
-    if (originalStream.dict.keys().some((key) => !allowedImageFields.has(key.decodeText()))) {
-      completed += 1;
-      onProgress?.({ completed, total, stage: "images" });
-      continue;
-    }
-    // Canvas JPEG output uses 8-bit DeviceRGB. Do not transform CMYK,
-    // grayscale, ICCBased or custom-filter resources into RGB without a
-    // verified colour-management pipeline.
-    const colour = originalStream.dict.lookup(PDFName.of("ColorSpace"));
-    const depth = originalStream.dict.lookup(PDFName.of("BitsPerComponent"));
-    const filter = originalStream.dict.lookup(PDFName.of("Filter"));
-    if (!(colour instanceof PDFName) || colour.toString() !== "/DeviceRGB" ||
-        !(depth instanceof PDFNumber) || depth.asNumber() !== 8 ||
-        !(filter instanceof PDFName) || filter.toString() !== "/DCTDecode") {
+    // The structural intelligence layer is the single authority for which
+    // image dictionaries may be replaced by 8-bit DeviceRGB JPEG. All masks,
+    // ICC/CMYK, custom colour mapping and metadata stay untouched.
+    if (!isCanonicalRgbJpegResource(originalStream)) {
       completed += 1;
       onProgress?.({ completed, total, stage: "images" });
       continue;
