@@ -109,8 +109,11 @@ export async function searchNativePdfTarget(options: {
           Math.abs(refined.quality - firstSuccess.quality) >= 0.01) {
         settings = refined;
       } else {
-        // Stop once a meaningful new point at the boundary is impossible.
-        break;
+        // JPEG size is not monotonic across real documents. Exhaust the
+        // remaining distinct coarse profiles instead of stopping at the
+        // first exhausted refinement boundary.
+        settings = PROFILES[nextIndex];
+        nextIndex += 1;
       }
     } else {
       settings = PROFILES[nextIndex];
@@ -118,7 +121,7 @@ export async function searchNativePdfTarget(options: {
     }
     if (!settings) break;
     const key = `${settings.dpi}:${settings.quality}`;
-    if (tried.has(key)) break;
+    if (tried.has(key)) continue;
     tried.add(key);
 
     const candidate = await makeCandidate(settings);
