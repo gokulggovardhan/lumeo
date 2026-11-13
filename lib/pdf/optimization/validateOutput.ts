@@ -8,6 +8,7 @@ import { PDFDocument } from "pdf-lib";
 export async function validatePdfOutput(
   bytes: Uint8Array | ArrayBuffer,
   expectedPageCount: number,
+  inspect?: (parsed: PDFDocument) => Promise<void> | void,
 ): Promise<{ byteLength: number; pageCount: number }> {
   const byteLength = bytes.byteLength;
   if (!Number.isSafeInteger(expectedPageCount) || expectedPageCount < 1) {
@@ -21,5 +22,8 @@ export async function validatePdfOutput(
   if (pageCount !== expectedPageCount) {
     throw new Error("Output validation failed. Page count did not match the expected document.");
   }
+  // Reuse the *same parsed serialized document* for source-provenance checks.
+  // No second parsing pass or unbounded duplicate browser-memory allocation.
+  await inspect?.(pdf);
   return { byteLength, pageCount };
 }
