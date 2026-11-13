@@ -35,6 +35,22 @@ export function isStalled(run, now = Date.now()) {
   return Number.isFinite(started) && now - started > STALL_MS;
 }
 
+/**
+ * Safe, read-only progress alarm. GitHub Actions cannot inspect whether a
+ * private ChatGPT conversation is idle, or resume coding. This observes only
+ * the ledger and checked-in phase implementation activity.
+ */
+export function isPhaseIdle({ activePhase, lastActivityAt, activeRuns = [], now = Date.now() }) {
+  if (activePhase === null) return false;
+  const last = Date.parse(lastActivityAt ?? "");
+  if (!Number.isFinite(last) || last > now) return false;
+  // Do not confuse an actively executing, genuinely non-stalled CI job with
+  // a development pause. Long-running jobs are reported by isStalled.
+  if (activeRuns.some((run) =>
+    run && ["queued", "in_progress", "waiting", "requested", "pending"].includes(run.status))) return false;
+  return now - last >= 60 * 60_000;
+}
+
 export function phasePrMatches(pr, phase) {
   if (phase === null || !pr || pr.base?.ref !== "main" || pr.head?.repo?.full_name !== REPO) return false;
   const pattern = new RegExp("\\bphase[\\s_-]*0?" + phase + "\\b", "i");
@@ -217,6 +233,27 @@ async function main() {
       run.run_attempt === MAX_AUTO_RETRIES && run.head_sha === pr.head.sha;
   }
 
+  // A twice-hourly run can detect stale *GitHub* phase activity, not chat
+  // inactivity. Use actual active-phase head commit dates plus the ledger,
+  // and avoid an alert while an active-phase CI run is still executing.
+  const phaseActivityDates = [ledger.updated_at];
+  for (const pr of activePrs) {
+    try {
+      const latest = await gh("/repos/" + REPO + "/commits/" + pr.head.sha);
+      phaseActivityDates.push(latest.commit?.committer?.date ?? latest.commit?.author?.date);
+    } catch {
+      anomalies.push("Could not verify active Phase " + activePhase + " PR #" + pr.number + " commit timestamp.");
+    }
+  }
+  const lastActivityAt = phaseActivityDates
+    .filter((value) => Number.isFinite(Date.parse(value ?? "")))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+  const phaseIdle = isPhaseIdle({
+    activePhase, lastActivityAt, activeRuns: trackedPrs.map((pr) => pr.ci),
+  });
+  if (phaseIdle) {
+    anomalies.push("Phase " + activePhase + " has no recorded implementation-commit/ledger activity for at least one hour; human follow-up is needed. This does not inspect or resume a ChatGPT conversation.");
+  }
   if (!allComplete && activePrs.length === 0) {
     anomalies.push("No matching open implementation PR for Phase " + activePhase + "; no unattended source-code agent is configured.");
   }
@@ -226,6 +263,7 @@ async function main() {
 
   const snapshot = {
     activePhase, phaseStatus: activePhase === null ? "COMPLETED" : phases.get(activePhase),
+    lastPhaseActivityAt: lastActivityAt, phaseIdle,
     mainSha, requiredCheck, production, mainWorkflows, trackedPrs, openPrChecks, anomalies,
     // A retry is a material state transition, but ordinary checks shouldn't
     // generate a new issue comment every half hour.
@@ -241,6 +279,7 @@ async function main() {
     "Production build-info: " + (production.reachable ? (production.exactSha ? "exact main SHA" : "SHA mismatch or older deployment") : "unreachable"),
     "Open PR required checks: " + (openPrChecks.map((item) => "#" + item.number + "=" + item.requiredCheck + (item.activePhase ? " (active phase)" : "")).join("; ") || "none"),
     "Open active-phase PRs: " + (trackedPrs.map((item) => "#" + item.number + " (" + (item.ci?.conclusion ?? item.ci?.status ?? "no CI") + ")").join(", ") || "none"),
+    "Phase activity: " + (lastActivityAt ?? "unknown") + "; one-hour GitHub inactivity: " + (phaseIdle ? "ALERT" : "not detected"),
     "Main workflows: " + mainWorkflows.map((r) => r.name + "=" + (r.conclusion ?? r.status)).join("; "),
     "Anomalies: " + (anomalies.join("; ") || "none detected"),
     "Action: " + (actions.join("; ") || "read-only inspection; no authorised retry"),
