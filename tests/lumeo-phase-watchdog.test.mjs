@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   parseLedger,
   isStalled,
+  isPhaseIdle,
   phasePrMatches,
   eligibleRetry,
 } from "../scripts/lumeo-phase-watchdog.mjs";
@@ -78,4 +79,27 @@ test("test, accessibility, security and production failures are not auto-retried
     pr, run, job: { ...job, steps: [...job.steps, { name: "Run unit tests", conclusion: "failure" }] },
     log: transientLog,
   }), false);
+});
+
+test("phase inactivity alarm is only raised after one hour of GitHub evidence silence", () => {
+  const now = Date.parse("2026-11-13T06:00:00Z");
+  const params = {
+    activePhase: 4,
+    lastActivityAt: "2026-11-13T04:59:59Z",
+    now,
+  };
+  assert.equal(isPhaseIdle({ ...params, lastActivityAt: "2026-11-13T05:31:00Z" }), false);
+  assert.equal(isPhaseIdle(params), true);
+  assert.equal(isPhaseIdle({ ...params, lastActivityAt: "2026-11-13T06:01:00Z" }), false);
+  assert.equal(isPhaseIdle({ ...params, activePhase: null }), false);
+  assert.equal(isPhaseIdle({ ...params, lastActivityAt: null }), false);
+});
+
+test("active phase CI is never mislabeled as idle development", () => {
+  const now = Date.parse("2026-11-13T06:00:00Z");
+  const stale = { activePhase: 4, lastActivityAt: "2026-11-13T03:00:00Z", now };
+  for (const status of ["queued", "in_progress", "waiting", "requested", "pending"]) {
+    assert.equal(isPhaseIdle({ ...stale, activeRuns: [{ status }] }), false, status);
+  }
+  assert.equal(isPhaseIdle({ ...stale, activeRuns: [{ status: "completed", conclusion: "success" }] }), true);
 });
