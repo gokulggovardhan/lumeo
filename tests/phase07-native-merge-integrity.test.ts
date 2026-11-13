@@ -23,8 +23,8 @@ async function fixture(label: string, rotations: number[]): Promise<ArrayBuffer>
 test("Phase 07 original merge retains source order, native text, crop boxes and composed rotations", async () => {
   const first = await fixture("ALPHA", [90, 0]);
   const second = await fixture("BETA", [180]);
-  const firstSize = first.byteLength;
-  const secondSize = second.byteLength;
+  const firstSnapshot = new Uint8Array(first.slice(0));
+  const secondSnapshot = new Uint8Array(second.slice(0));
   const progress: number[] = [];
   const output = await mergeNativeDocuments([
     { name: "first.pdf", bytes: first, rotation: 90 },
@@ -33,8 +33,8 @@ test("Phase 07 original merge retains source order, native text, crop boxes and 
 
   assert.deepEqual(progress, [1, 2, 3]);
   assert.equal(output.pageCount, 3);
-  assert.equal(first.byteLength, firstSize, "input buffers must remain intact");
-  assert.equal(second.byteLength, secondSize, "input buffers must remain intact");
+  assert.deepEqual(new Uint8Array(first), firstSnapshot, "first source bytes must remain unchanged");
+  assert.deepEqual(new Uint8Array(second), secondSnapshot, "second source bytes must remain unchanged");
   const parsed = await PDFDocument.load(output.bytes);
   assert.equal(parsed.getPageCount(), 3);
   assert.deepEqual(parsed.getPages().map(page => page.getRotation().angle), [180, 90, 90]);
@@ -70,4 +70,28 @@ test("Phase 07 merge cancellation rejects without producing a partial output", a
     ], { format: "original", marginPoints: 0, signal: controller.signal }),
     (error: unknown) => error instanceof DOMException && error.name === "AbortError",
   );
+});
+
+
+test("Phase 07 cancellation during page progress never returns a partial merged document", async () => {
+  const first = await fixture("PROGRESS", [0, 90]);
+  const second = await fixture("SECOND", [180]);
+  const controller = new AbortController();
+  const completed: number[] = [];
+  await assert.rejects(
+    mergeNativeDocuments([
+      { name: "progress.pdf", bytes: first, rotation: 0 },
+      { name: "second.pdf", bytes: second, rotation: 0 },
+    ], {
+      format: "original",
+      marginPoints: 0,
+      signal: controller.signal,
+      onProgress: (pages) => {
+        completed.push(pages);
+        if (pages === 1) controller.abort();
+      },
+    }),
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  assert.deepEqual(completed, [1], "no further page progress after cancellation");
 });
