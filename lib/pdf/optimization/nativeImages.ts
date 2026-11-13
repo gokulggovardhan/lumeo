@@ -1,6 +1,7 @@
 import { PDFDocument, PDFName, PDFNumber, PDFRawStream } from "pdf-lib";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "../embeddedImages.ts";
 import { validatePdfOutput } from "./validateOutput.ts";
+import { verifyLosslessPdfRewrite } from "./losslessIntegrity.ts";
 import { inspectPdfStructure, isCanonicalRgbJpegResource } from "../structuralEligibility.ts";
 
 export type NativeOptimizationMode = "lossless" | "smart" | "maximum";
@@ -96,10 +97,19 @@ export async function optimizeNativePdfImages(
 
   onProgress?.({ completed: 0, total: 1, stage: "inspect" });
   let bestBytes = originalBytes.slice(0);
-  const lossless = await pdf.save({ useObjectStreams: true, addDefaultPage: false });
-  if (lossless.byteLength < bestBytes.byteLength) {
-    await validatePdfOutput(lossless, expectedPages);
-    bestBytes = asArrayBuffer(lossless);
+  // A smaller object-stream serialization must also preserve the original
+  // page dictionaries, content streams and nested font/image resource bytes.
+  // Invalid or unverifiable rewrites fall back to the exact source PDF.
+  try {
+    const lossless = await pdf.save({ useObjectStreams: true, addDefaultPage: false });
+    if (lossless.byteLength < bestBytes.byteLength) {
+      if (!(await verifyLosslessPdfRewrite(pdf, lossless))) {
+        return keepOriginal(originalBytes, "Lossless integrity could not be verified; the original PDF was retained.");
+      }
+      bestBytes = asArrayBuffer(lossless);
+    }
+  } catch {
+    return keepOriginal(originalBytes, "Lossless serialization could not be verified; the original PDF was retained.");
   }
 
   if (mode === "lossless" || !transcode) {
