@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { degrees, PDFDocument, StandardFonts } from "pdf-lib";
+import { degrees, PDFDocument, PDFName, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 
@@ -94,4 +94,40 @@ test("Phase 07 cancellation during page progress never returns a partial merged 
     (error: unknown) => error instanceof DOMException && error.name === "AbortError",
   );
   assert.deepEqual(completed, [1], "no further page progress after cancellation");
+});
+
+
+test("Phase 07 original merge retains embedded image resources alongside selectable text", async () => {
+  const sourcePdf = await PDFDocument.create();
+  const font = await sourcePdf.embedFont(StandardFonts.Helvetica);
+  const image = await sourcePdf.embedPng(Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=", "base64"));
+  const page = sourcePdf.addPage([300, 300]);
+  page.drawImage(image, { x: 30, y: 30, width: 80, height: 80 });
+  page.drawText("IMAGE RESOURCE", { x: 30, y: 150, font, size: 16 });
+  const source = bufferOf(await sourcePdf.save());
+  const snapshot = new Uint8Array(source.slice(0));
+  const merged = await mergeNativeDocuments([
+    { name: "image.pdf", bytes: source, rotation: 0 },
+    { name: "text.pdf", bytes: await fixture("TEXT", [0]), rotation: 0 },
+  ], { format: "original", marginPoints: 0 });
+  assert.deepEqual(new Uint8Array(source), snapshot, "image source bytes must not be mutated");
+  const output = await PDFDocument.load(merged.bytes);
+  assert.equal(output.getPageCount(), 2);
+  assert.ok(output.getPage(0).node.Resources()?.lookup(PDFName.of("XObject")),
+    "copied page must retain its image XObject resources");
+  const task = pdfjsLib.getDocument({ data: new Uint8Array(merged.bytes.slice(0)), useSystemFonts: true });
+  try {
+    const pdf = await task.promise;
+    const first = await pdf.getPage(1);
+    const operators = await first.getOperatorList();
+    assert.ok(operators.fnArray.some(op => op === pdfjsLib.OPS.paintImageXObject ||
+      op === pdfjsLib.OPS.paintInlineImageXObject || op === pdfjsLib.OPS.paintImageXObjectRepeat),
+      "merged image must remain a native PDF image paint operation");
+    const content = await first.getTextContent();
+    assert.ok(content.items.some(item => "str" in item && item.str.includes("IMAGE RESOURCE")),
+      "selectable text must survive alongside embedded images");
+  } finally {
+    await task.destroy();
+  }
 });
