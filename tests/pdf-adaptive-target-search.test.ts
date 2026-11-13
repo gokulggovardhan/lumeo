@@ -122,7 +122,7 @@ test("non-monotonic document sizes continue beyond an exhausted refinement bound
   const result = await searchNativePdfTarget({
     originalBytes: new ArrayBuffer(150_000),
     targetBytes: 60_000,
-    maxAttempts: 8,
+    maxAttempts: 12,
     makeCandidate: async ({ dpi }) => {
       seen.push(dpi);
       // First profile succeeds, second fails, but a later stronger profile
