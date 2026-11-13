@@ -1,5 +1,6 @@
 import { PDFDocument, PDFName, PDFNumber, PDFRawStream } from "pdf-lib";
-import { findEmbeddedJpegs, planEmbeddedJpegResize } from "../embeddedImages.ts";
+import { planEmbeddedJpegResize } from "../embeddedImages.ts";
+import { collectDocumentJpegCandidates } from "./documentAwareImages.ts";
 import { validatePdfOutput } from "./validateOutput.ts";
 import { verifyLosslessPdfRewrite } from "./losslessIntegrity.ts";
 import { inspectPdfStructure, isCanonicalRgbJpegResource } from "../structuralEligibility.ts";
@@ -123,27 +124,11 @@ export async function optimizeNativePdfImages(
     };
   }
 
-  // Collect distinct images before touching the indirect-object graph.
-  const candidates = new Map<string, {
-    ref: ReturnType<typeof findEmbeddedJpegs>[number]["ref"];
-    bytes: Uint8Array;
-    pageWidth: number;
-    pageHeight: number;
-  }>();
-  for (const page of pdf.getPages()) {
-    const box = page.getCropBox();
-    for (const jpeg of findEmbeddedJpegs(page)) {
-      if (!candidates.has(jpeg.ref.toString())) {
-        candidates.set(jpeg.ref.toString(), {
-          ref: jpeg.ref,
-          bytes: jpeg.bytes,
-          pageWidth: box.width,
-          pageHeight: box.height,
-        });
-      }
-    }
-  }
-  if (candidates.size > 256) {
+  // Aggregate all image aliases and page envelopes before transcoding a
+  // shared indirect object. A first-page-only size can damage an image that
+  // also appears larger elsewhere. Complex Form XObjects remain lossless.
+  const candidates = collectDocumentJpegCandidates(pdf);
+  if (candidates.length > 256) {
     throw new Error("This PDF contains too many independent images for a safe browser optimisation pass.");
   }
 
@@ -151,8 +136,8 @@ export async function optimizeNativePdfImages(
   let changed = 0;
   let hasFullFidelityEvidence = true;
   let lowestAcceptedFidelity = 1;
-  const total = candidates.size;
-  for (const candidate of candidates.values()) {
+  const total = candidates.length;
+  for (const candidate of candidates) {
     const originalStream = pdf.context.lookup(candidate.ref);
     if (!(originalStream instanceof PDFRawStream)) continue;
     // The structural intelligence layer is the single authority for which
