@@ -115,3 +115,25 @@ test("invalid measured fidelity is rejected rather than trusted", async () => {
     }),
   }), /Invalid measured PDF candidate fidelity/);
 });
+
+
+test("non-monotonic document sizes continue beyond an exhausted refinement boundary", async () => {
+  const seen: number[] = [];
+  const result = await searchNativePdfTarget({
+    originalBytes: new ArrayBuffer(150_000),
+    targetBytes: 60_000,
+    maxAttempts: 8,
+    makeCandidate: async ({ dpi }) => {
+      seen.push(dpi);
+      // First profile succeeds, second fails, but a later stronger profile
+      // succeeds with better measured fidelity than the first success.
+      const size = dpi === 300 ? 55_000 : dpi >= 200 ? 90_000 : 51_000;
+      const score = dpi === 160 ? 0.98 : dpi === 300 ? 0.8 : 0.4;
+      return { bytes: new ArrayBuffer(size), outputBytes: size, fidelityScore: score };
+    },
+  });
+  assert.ok(seen.includes(160), "coarse exploration must continue after boundary refinement");
+  assert.equal(result.outcome, "achieved");
+  assert.equal(result.bytes.byteLength, 51_000);
+  assert.equal(new Set(result.attempts.map(a => a.dpi + ":" + a.quality)).size, result.attempts.length);
+});
