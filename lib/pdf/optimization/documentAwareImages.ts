@@ -1,4 +1,4 @@
-import { PDFDocument, PDFRef, PDFRawStream } from "pdf-lib";
+import { PDFRawStream, type PDFDocument, type PDFRef } from "pdf-lib";
 import { findEmbeddedJpegs } from "../embeddedImages.ts";
 import { inspectPdfStructure, isCanonicalRgbJpegResource } from "../structuralEligibility.ts";
 
