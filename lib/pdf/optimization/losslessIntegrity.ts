@@ -156,3 +156,23 @@ export async function verifyLosslessPdfRewrite(
     return false;
   }
 }
+
+
+/**
+ * Compare source and copied PDF object graphs across independent contexts.
+ * Indirect reference numbers may change during a legitimate native copy;
+ * resolved content operators, resources, fonts and embedded streams may not.
+ * Bounded verification fails closed on cycles, unknown or malformed objects.
+ */
+export function equivalentPdfObjectTree(
+  original: PDFDocument,
+  originalObject: unknown,
+  candidate: PDFDocument,
+  candidateObject: unknown,
+): boolean {
+  try {
+    return sameObject(originalObject, candidateObject, comparison(original, candidate));
+  } catch {
+    return false;
+  }
+}
