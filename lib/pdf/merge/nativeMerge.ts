@@ -2,6 +2,7 @@ import { degrees, PDFDocument, rgb } from "pdf-lib";
 import { inspectPdfStructure } from "../structuralEligibility.ts";
 import { normalizeRotation } from "../rotation.ts";
 import { validatePdfOutput } from "../optimization/validateOutput.ts";
+import { certifyNativeMergePages } from "./nativeIntegrity.ts";
 
 /**
  * Browser-independent native PDF merge core. Never converts pages to images.
@@ -208,7 +209,10 @@ export async function mergeNativeDocuments(
   const result = await merged.save({ useObjectStreams: true });
   assertMergeActive(options.signal);
   if (!result.byteLength) throw new Error("The merged PDF is empty.");
-  await validatePdfOutput(result, totalPages);
+  await validatePdfOutput(result, totalPages, (parsed) => {
+    assertMergeActive(options.signal);
+    certifyNativeMergePages(sources, parsed, options.format, pageSize);
+  });
   assertMergeActive(options.signal);
   return {
     bytes: result.buffer.slice(result.byteOffset, result.byteOffset + result.byteLength) as ArrayBuffer,
