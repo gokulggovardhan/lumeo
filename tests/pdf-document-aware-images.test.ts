@@ -22,6 +22,8 @@ async function sharedDocument(withForm = false) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const jpeg = await doc.embedJpg(paddedJpeg());
+  // Materialize the indirect JPEG stream before inspecting its resource ref.
+  await jpeg.embed();
   const small = doc.addPage([20, 20]);
   small.drawImage(jpeg, { x: 0, y: 0, width: 20, height: 15 });
   small.drawText("SHARED", { x: 1, y: 18, size: 3, font });
