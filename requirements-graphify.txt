@@ -1,5 +1,5 @@
 # Graph tooling environment. ONE version number, ONE place -- CI installs
-# from this file and so should you. See CLAUDE.md for the install command.
+# from this file and so should you. See manifest.md (section 9 and Practical command reference) for setup.
 #
 # Why this file exists at all:
 #
