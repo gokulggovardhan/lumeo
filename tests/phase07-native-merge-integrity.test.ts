@@ -295,6 +295,64 @@ test("Phase 07 copied page preserves an actual embedded TrueType font program", 
     "copied TrueType FontFile2 bytes and native font identity must match the original");
 });
 
+test("Phase 07 fitted merge formats retain native text, alpha image operators and target geometry", async () => {
+  const source = await PDFDocument.create();
+  const font = await source.embedFont(StandardFonts.Helvetica);
+  const image = await source.embedPng(Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8DwHwjrGcD0f4YTAD2YB0LLpftwAAAAAElFTkSuQmCC", "base64"));
+  const sourcePage = source.addPage([400, 600]);
+  sourcePage.setCropBox(12, 18, 280, 400);
+  sourcePage.setRotation(degrees(90));
+  sourcePage.drawImage(image, { x: 45, y: 45, width: 65, height: 65 });
+  sourcePage.drawText("FITTED NATIVE TEXT", { x: 40, y: 310, font, size: 18 });
+  const original = bufferOf(await source.save());
+  const second = await fixture("FOLLOWUP", [0]);
+  const originalBytes = new Uint8Array(original.slice(0));
+  const secondBytes = new Uint8Array(second.slice(0));
+  const cases = [
+    { format: "smartA4Portrait", width: 595.28, height: 841.89 },
+    { format: "smartA4Landscape", width: 841.89, height: 595.28 },
+    { format: "matchFirst", width: 280, height: 400 },
+  ] as const;
+
+  for (const { format, width, height } of cases) {
+    const result = await mergeNativeDocuments([
+      { name: "cropped-rotated.pdf", bytes: original, rotation: 270 },
+      { name: "following.pdf", bytes: second, rotation: 0 },
+    ], { format, marginPoints: 12 });
+    assert.equal(result.pageCount, 2, `${format} must preserve both pages`);
+    const output = await PDFDocument.load(result.bytes);
+    assert.equal(output.getPageCount(), 2);
+    for (const page of output.getPages()) {
+      const size = page.getSize();
+      assert.equal(size.width, width, `${format} output width`);
+      assert.equal(size.height, height, `${format} output height`);
+    }
+
+    const task = pdfjsLib.getDocument({ data: new Uint8Array(result.bytes.slice(0)), useSystemFonts: true });
+    try {
+      const document = await task.promise;
+      assert.equal(document.numPages, 2);
+      const firstPage = await document.getPage(1);
+      const text = await firstPage.getTextContent();
+      assert.ok(text.items.some(item => "str" in item && item.str.includes("FITTED NATIVE TEXT")),
+        `${format} must retain selectable text inside the embedded native page`);
+      const operators = await firstPage.getOperatorList();
+      assert.ok(operators.fnArray.some(op => op === pdfjsLib.OPS.paintImageXObject ||
+        op === pdfjsLib.OPS.paintInlineImageXObject || op === pdfjsLib.OPS.paintImageXObjectRepeat),
+        `${format} must keep a native image paint operator, not rasterize the page`);
+      const following = await document.getPage(2);
+      const followingText = await following.getTextContent();
+      assert.ok(followingText.items.some(item => "str" in item && item.str.includes("FOLLOWUP SOURCE PAGE 1")),
+        `${format} must retain the second source's selectable text and order`);
+    } finally {
+      await task.destroy();
+    }
+    assert.deepEqual(new Uint8Array(original), originalBytes, `${format} must leave the image source unchanged`);
+    assert.deepEqual(new Uint8Array(second), secondBytes, `${format} must leave the other source unchanged`);
+  }
+});
+
 test("Phase 07 refuses native merge of URL link annotations without losing any source bytes", async () => {
   const doc = await PDFDocument.create();
   const page = doc.addPage([400, 600]);
