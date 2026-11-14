@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { degrees, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts } from "pdf-lib";
+import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 
@@ -209,6 +209,8 @@ test("Phase 07 native copied page retains exact PNG image stream and font proven
   const parsedInput = await PDFDocument.load(serialized.slice(0));
   const sourceImages = pageImageFingerprint(parsedInput, 0);
   const sourceFonts = pageFontFingerprint(parsedInput, 0);
+  assert.ok(sourceImages.some(image => image.softMask !== null),
+    "fixture must contain a real PNG soft alpha mask, not merely an untested optional branch");
   assert.ok(sourceFonts.length >= 2, "test must embed distinct native font resources");
 
   const result = await mergeNativeDocuments([
@@ -223,6 +225,74 @@ test("Phase 07 native copied page retains exact PNG image stream and font proven
     "original font dictionaries and encodings must not be substituted or rasterized");
   assert.equal(output.getPage(0).getWidth(), 420);
   assert.equal(output.getPage(0).getHeight(), 520);
+});
+
+
+/**
+ * Original test-only font, generated with fontTools (not copied from any
+ * third-party typeface). It contains a real TrueType glyf, cmap, hmtx, name
+ * and OS/2 table for the "A" glyph. The fixture is embedded locally and
+ * requires no network, added package or CI host-specific fonts.
+ */
+const PHASE07_SYNTHETIC_TTF_BASE64 =
+  "AAEAAAAKAIAAAwAgT1MvMkhBRKMAAAEoAAAAYGNtYXAADACUAAABkAAAADRnbHlmtnzZIgAAAcwAAAAwaGVhZGIMQ84AAACsAAAANmhoZWEF/AKDAAAA5AAAACRobXR4BSgAUAAAAYgAAAAIbG9jYQAYAAAAAAHEAAAABm1heHAABQANAAABCAAAACBuYW1lqsLYQAAAAfwAAAIBcG9zdAAoAAAAAAQAAAAAJgABAAAAAQAAd5Qexl8PPPUAAQPoAAAAAAAAAAAAAAAAAAAAAAB4AAACgALuAAAAAwACAAAAAAAAAAEAAANS/zgAAALQAFAAeAJYAAEAAAAAAAAAAAAAAAAAAAACAAEAAAACAAsAAgAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAwKUAZAABQAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAPz8/PwAAAEEAQQNS/zgAAANSAMgAAAAAAAAAAAAAAu4AAAAgAAACWAAAAtAAUAAAAAIAAAADAAAAFAADAAEAAAAUAAQAIAAAAAQABAABAAAAQf//AAAAQf///8AAAQAAAAAAAAAAABgAAAACAHgAAAKAAu4ABwAKAAAzEzMTIycjBxMzA3iM0qp4KNIjQZZQAu79EqqqAQ4BQAAAAAwAlgABAAAAAAABABcAAAABAAAAAAACAAcAFwABAAAAAAADABQAHgABAAAAAAAEAB8AMgABAAAAAAAFAAsAUQABAAAAAAAGAB0AXAADAAEECQABAC4AeQADAAEECQACAA4ApwADAAEECQADACgAtQADAAEECQAEAD4A3QADAAEECQAFABYBGwADAAEECQAGADoBMUx1bWVvIFBoYXNlMDcgU3ludGhldGljUmVndWxhckx1bWVvLVBoYXNlMDctVGVzdC0xTHVtZW8gUGhhc2UwNyBTeW50aGV0aWMgUmVndWxhclZlcnNpb24gMS4wTHVtZW9QaGFzZTA3U3ludGhldGljLVJlZ3VsYXIATAB1AG0AZQBvACAAUABoAGEAcwBlADAANwAgAFMAeQBuAHQAaABlAHQAaQBjAFIAZQBnAHUAbABhAHIATAB1AG0AZQBvAC0AUABoAGEAcwBlADAANwAtAFQAZQBzAHQALQAxAEwAdQBtAGUAbwAgAFAAaABhAHMAZQAwADcAIABTAHkAbgB0AGgAZQB0AGkAYwAgAFIAZQBnAHUAbABhAHIAVgBlAHIAcwBpAG8AbgAgADEALgAwAEwAdQBtAGUAbwBQAGgAYQBzAGUAMAA3AFMAeQBuAHQAaABlAHQAaQBjAC0AUgBlAGcAdQBsAGEAcgAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAkAAA=";
+
+function embeddedTrueTypeProgramFingerprints(document: PDFDocument, pageIndex: number) {
+  const resources = document.getPage(pageIndex).node.Resources();
+  assert.ok(resources, "embedded font page must have resources");
+  const fonts = resources.lookup(PDFName.of("Font"));
+  assert.ok(fonts instanceof PDFDict, "embedded font page must have font resources");
+  const fingerprints = fonts.entries().flatMap(([alias, ref]) => {
+    const font = document.context.lookup(ref);
+    if (!(font instanceof PDFDict)) return [];
+    const descendants = font.lookup(PDFName.of("DescendantFonts"));
+    let descriptorOwner = font;
+    if (descendants instanceof PDFArray && descendants.size() > 0) {
+      const descendant = document.context.lookup(descendants.get(0));
+      assert.ok(descendant instanceof PDFDict, "CID descendant must resolve");
+      descriptorOwner = descendant;
+    }
+    const descriptor = descriptorOwner.lookup(PDFName.of("FontDescriptor"));
+    if (!(descriptor instanceof PDFDict)) return [];
+    const fontFile = descriptor.get(PDFName.of("FontFile2"));
+    if (!fontFile) return [];
+    const embedded = document.context.lookup(fontFile);
+    assert.ok(embedded instanceof PDFRawStream, "TrueType FontFile2 must resolve to a native stream");
+    return [{
+      alias: alias.toString(),
+      subtype: font.get(PDFName.of("Subtype"))?.toString() ?? null,
+      baseFont: font.get(PDFName.of("BaseFont"))?.toString() ?? null,
+      program: Buffer.from(embedded.getContents()).toString("base64"),
+    }];
+  });
+  assert.ok(fingerprints.length > 0, "a real embedded TrueType font program is mandatory");
+  return fingerprints.sort((a, b) => a.alias.localeCompare(b.alias));
+}
+
+test("Phase 07 copied page preserves an actual embedded TrueType font program", async () => {
+  const fontkitModule = await import("@pdf-lib/fontkit");
+  const fontkit = fontkitModule.default ?? fontkitModule;
+  const source = await PDFDocument.create();
+  source.registerFontkit(fontkit as unknown as Parameters<PDFDocument["registerFontkit"]>[0]);
+  const font = await source.embedFont(Buffer.from(PHASE07_SYNTHETIC_TTF_BASE64, "base64"), {
+    subset: false,
+  });
+  const page = source.addPage([390, 520]);
+  page.drawText("AAAA", { x: 40, y: 400, size: 28, font });
+  const bytes = bufferOf(await source.save());
+  const untouchedBytes = new Uint8Array(bytes.slice(0));
+  const original = await PDFDocument.load(bytes.slice(0));
+  const expected = embeddedTrueTypeProgramFingerprints(original, 0);
+
+  const result = await mergeNativeDocuments([
+    { name: "embedded-font.pdf", bytes, rotation: 0 },
+    { name: "plain.pdf", bytes: await fixture("PLAIN", [0]), rotation: 0 },
+  ], { format: "original", marginPoints: 0 });
+  assert.deepEqual(new Uint8Array(bytes), untouchedBytes, "embedded-font source remains immutable");
+  const output = await PDFDocument.load(result.bytes);
+  assert.equal(output.getPageCount(), 2);
+  assert.deepEqual(embeddedTrueTypeProgramFingerprints(output, 0), expected,
+    "copied TrueType FontFile2 bytes and native font identity must match the original");
 });
 
 test("Phase 07 refuses native merge of URL link annotations without losing any source bytes", async () => {
