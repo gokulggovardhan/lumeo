@@ -101,7 +101,7 @@ test("Phase 07 original merge retains embedded image resources alongside selecta
   const sourcePdf = await PDFDocument.create();
   const font = await sourcePdf.embedFont(StandardFonts.Helvetica);
   const image = await sourcePdf.embedPng(Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=", "base64"));
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8DwHwjrGcD0f4YTAD2YB0LLpftwAAAAAElFTkSuQmCC", "base64"));
   const page = sourcePdf.addPage([300, 300]);
   page.drawImage(image, { x: 30, y: 30, width: 80, height: 80 });
   page.drawText("IMAGE RESOURCE", { x: 30, y: 150, font, size: 16 });
@@ -200,7 +200,7 @@ test("Phase 07 native copied page retains exact PNG image stream and font proven
   const helvetica = await source.embedFont(StandardFonts.Helvetica);
   const courier = await source.embedFont(StandardFonts.Courier);
   const image = await source.embedPng(Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=", "base64"));
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8DwHwjrGcD0f4YTAD2YB0LLpftwAAAAAElFTkSuQmCC", "base64"));
   const page = source.addPage([420, 520]);
   page.drawImage(image, { x: 28, y: 34, width: 86, height: 76 });
   page.drawText("RESOURCE PROVENANCE HELVETICA", { x: 40, y: 350, font: helvetica, size: 15 });
