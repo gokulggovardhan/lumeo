@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { degrees, PDFDocument, PDFName, StandardFonts } from "pdf-lib";
+import { degrees, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
 
@@ -130,4 +130,107 @@ test("Phase 07 original merge retains embedded image resources alongside selecta
   } finally {
     await task.destroy();
   }
+});
+
+/**
+ * A copied native page must retain the exact image stream and its decoded
+ * resource contract, not merely still reference an XObject name. Comparing
+ * the actual PDF stream bytes also covers alpha-mask image resources without
+ * assuming how a PDF viewer renders one particular colour profile.
+ */
+function pageImageFingerprint(document: PDFDocument, pageIndex: number) {
+  const resources = document.getPage(pageIndex).node.Resources();
+  assert.ok(resources, "image page must have resource dictionary");
+  const xObjects = resources.lookup(PDFName.of("XObject"));
+  assert.ok(xObjects instanceof PDFDict, "image XObject dictionary must survive");
+  const images = xObjects.entries().flatMap(([alias, ref]) => {
+    const value = document.context.lookup(ref);
+    if (!(value instanceof PDFRawStream) ||
+        value.dict.lookup(PDFName.of("Subtype"))?.toString() !== "/Image") return [];
+    const fields = ["Type", "Subtype", "Width", "Height", "ColorSpace",
+      "BitsPerComponent", "Filter", "Decode", "Mask", "SMask"];
+    return [{
+      alias: alias.toString(),
+      stream: Buffer.from(value.getContents()).toString("base64"),
+      dictionary: Object.fromEntries(fields.map(name =>
+        [name, value.dict.get(PDFName.of(name))?.toString() ?? null])),
+    }];
+  });
+  assert.ok(images.length > 0, "actual image streams must be present");
+  return images.sort((a, b) => a.alias.localeCompare(b.alias));
+}
+
+function pageFontFingerprint(document: PDFDocument, pageIndex: number) {
+  const resources = document.getPage(pageIndex).node.Resources();
+  assert.ok(resources, "font page must have resources");
+  const fonts = resources.lookup(PDFName.of("Font"));
+  assert.ok(fonts instanceof PDFDict, "source fonts must remain native");
+  const fields = ["Type", "Subtype", "BaseFont", "Encoding", "FirstChar", "LastChar"];
+  return fonts.entries().map(([alias, ref]) => {
+    const font = document.context.lookup(ref);
+    assert.ok(font instanceof PDFDict, "font reference must resolve to a dictionary");
+    return {
+      alias: alias.toString(),
+      dictionary: Object.fromEntries(fields.map(name =>
+        [name, font.get(PDFName.of(name))?.toString() ?? null])),
+      // The full dictionary also captures encoding differences. These
+      // generated standard fonts have no embedded font file streams.
+      encoded: font.toString(),
+    };
+  }).sort((a, b) => a.alias.localeCompare(b.alias));
+}
+
+test("Phase 07 native copied page retains exact PNG image stream and font provenance", async () => {
+  const source = await PDFDocument.create();
+  const helvetica = await source.embedFont(StandardFonts.Helvetica);
+  const courier = await source.embedFont(StandardFonts.Courier);
+  const image = await source.embedPng(Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=", "base64"));
+  const page = source.addPage([420, 520]);
+  page.drawImage(image, { x: 28, y: 34, width: 86, height: 76 });
+  page.drawText("RESOURCE PROVENANCE HELVETICA", { x: 40, y: 350, font: helvetica, size: 15 });
+  page.drawText("RESOURCE PROVENANCE COURIER", { x: 40, y: 300, font: courier, size: 13 });
+  const serialized = bufferOf(await source.save());
+  const parsedInput = await PDFDocument.load(serialized.slice(0));
+  const sourceImages = pageImageFingerprint(parsedInput, 0);
+  const sourceFonts = pageFontFingerprint(parsedInput, 0);
+  assert.ok(sourceFonts.length >= 2, "test must embed distinct native font resources");
+
+  const result = await mergeNativeDocuments([
+    { name: "image-fonts.pdf", bytes: serialized, rotation: 0 },
+    { name: "second.pdf", bytes: await fixture("SECOND", [90]), rotation: 0 },
+  ], { format: "original", marginPoints: 0 });
+  const output = await PDFDocument.load(result.bytes);
+  assert.equal(output.getPageCount(), 2);
+  assert.deepEqual(pageImageFingerprint(output, 0), sourceImages,
+    "copied image payload bytes, filter, colour and dimensions must exactly match the source");
+  assert.deepEqual(pageFontFingerprint(output, 0), sourceFonts,
+    "original font dictionaries and encodings must not be substituted or rasterized");
+  assert.equal(output.getPage(0).getWidth(), 420);
+  assert.equal(output.getPage(0).getHeight(), 520);
+});
+
+test("Phase 07 refuses native merge of URL link annotations without losing any source bytes", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([400, 600]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("LINK PRESERVATION REQUIRED", { x: 30, y: 500, font, size: 15 });
+  const link = doc.context.obj({
+    Type: "Annot", Subtype: "Link", Rect: [20, 470, 200, 510],
+    Border: [0, 0, 0], A: { S: "URI", URI: "https://example.invalid/link" },
+  });
+  const linkRef = doc.context.register(link);
+  page.node.set(PDFName.of("Annots"), doc.context.obj([linkRef]));
+  const original = bufferOf(await doc.save());
+  const snapshot = new Uint8Array(original.slice(0));
+  const parsed = await PDFDocument.load(original.slice(0));
+  assert.equal(parsed.getPage(0).node.Annots()?.size(), 1,
+    "fixture must actually contain a URL link annotation");
+  await assert.rejects(mergeNativeDocuments([
+    { name: "linked.pdf", bytes: original, rotation: 0 },
+    { name: "plain.pdf", bytes: await fixture("PLAIN", [0]), rotation: 0 },
+  ], { format: "original", marginPoints: 0 }), /protected or interactive document structure/,
+  "a rejected interactive document must not produce a damaged merged download");
+  assert.deepEqual(new Uint8Array(original), snapshot,
+    "input URL link and all original source bytes must remain untouched");
 });
