@@ -1,0 +1,68 @@
+name: Lumeo Dependency Security Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/verify-reviewed-supabase-sdk.mjs'
+      - '.github/workflows/dependency-security-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumeo-dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Report advisory packages and enforce no high/critical findings
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Collect and enforce detailed npm audit findings
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          audit_exit=$?
+          set -e
+          echo "Raw npm audit exit: ${audit_exit}"
+          test -s npm-audit.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('npm-audit.json', 'utf8'));
+          if (!report?.metadata?.vulnerabilities || !report.vulnerabilities) {
+            throw new Error('npm audit was incomplete; fail closed.');
+          }
+          for (const [name, finding] of Object.entries(report.vulnerabilities)) {
+            console.log(JSON.stringify({
+              name, severity: finding.severity, direct: finding.isDirect,
+              via: finding.via?.map(v => typeof v === 'string' ? v : v.name),
+              range: finding.range, fixAvailable: finding.fixAvailable,
+            }));
+          }
+          const totals = report.metadata.vulnerabilities;
+          console.log('npm audit counts: ' + JSON.stringify(totals));
+          if ((totals.high ?? 0) > 0 || (totals.critical ?? 0) > 0) {
+            throw new Error('Unresolved critical/high dependency advisories.');
+          }
+          NODE
+      - name: Upload detailed audit JSON
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lumeo-dependency-security-audit
+          path: npm-audit.json
+          if-no-files-found: ignore
+          retention-days: 14
