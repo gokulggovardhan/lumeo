@@ -3,6 +3,7 @@ import test from "node:test";
 import { degrees, PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, StandardFonts } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { mergeNativeDocuments } from "../lib/pdf/merge/nativeMerge.ts";
+import { inspectPdfStructure } from "../lib/pdf/structuralEligibility.ts";
 
 function bufferOf(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -351,6 +352,32 @@ test("Phase 07 fitted merge formats retain native text, alpha image operators an
     assert.deepEqual(new Uint8Array(original), originalBytes, `${format} must leave the image source unchanged`);
     assert.deepEqual(new Uint8Array(second), secondBytes, `${format} must leave the other source unchanged`);
   }
+});
+
+test("Phase 07 malformed nested Form resources fail closed before native merge", async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([250, 350]);
+  // An invalid explicit /Resources is NOT equivalent to an absent inherited
+  // resource dictionary; treating it as absent can approve damaged content.
+  const form = pdf.context.flateStream("q\\nQ\\n", {
+    Type: "XObject", Subtype: "Form", BBox: [0, 0, 20, 20],
+    Resources: PDFName.of("InvalidFormResources"),
+  });
+  const formRef = pdf.context.register(form);
+  const resources = page.node.Resources();
+  assert.ok(resources, "fixture page must have resource dictionary");
+  resources.set(PDFName.of("XObject"), pdf.context.obj({ BrokenForm: formRef }));
+
+  const report = inspectPdfStructure(pdf);
+  assert.equal(report.safeForMerge, false, "malformed nested resource must be rejected");
+  assert.match(report.unsupportedReasons.join(" "), /Form XObject resource dictionary/);
+  const original = bufferOf(await pdf.save());
+  const snapshot = new Uint8Array(original.slice(0));
+  await assert.rejects(mergeNativeDocuments([
+    { name: "malformed-form.pdf", bytes: original, rotation: 0 },
+    { name: "safe.pdf", bytes: await fixture("SAFE", [0]), rotation: 0 },
+  ], { format: "original", marginPoints: 0 }), /unsupported page geometry or PDF resources/);
+  assert.deepEqual(new Uint8Array(original), snapshot, "preflight failure must preserve the untouched source");
 });
 
 test("Phase 07 refuses native merge of URL link annotations without losing any source bytes", async () => {

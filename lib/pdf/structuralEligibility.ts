@@ -218,8 +218,17 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
         seenForms.add(objectRef);
         totalFormXObjects += 1;
         const nested = stream.dict.get(PDFName.of("Resources"));
-        // A Form can inherit page resources when no local Resources exist.
-        if (nested) visitResources(asDict(nested, context), page, depth + 1);
+        // A Form can inherit page resources only when no local Resources exist.
+        // An explicitly present but malformed /Resources dictionary is unsafe:
+        // do not silently treat it as missing and approve an invalid XObject.
+        if (nested) {
+          const nestedResources = asDict(nested, context);
+          if (!nestedResources) {
+            unsafe.add("A Form XObject resource dictionary could not be resolved.");
+          } else {
+            visitResources(nestedResources, page, depth + 1);
+          }
+        }
       } else {
         // Do not guess how PostScript, image alternates, or unknown XObject
         // programs should be serialized or preserved under an embedding.
