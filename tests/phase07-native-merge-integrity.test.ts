@@ -148,12 +148,27 @@ function pageImageFingerprint(document: PDFDocument, pageIndex: number) {
     if (!(value instanceof PDFRawStream) ||
         value.dict.lookup(PDFName.of("Subtype"))?.toString() !== "/Image") return [];
     const fields = ["Type", "Subtype", "Width", "Height", "ColorSpace",
-      "BitsPerComponent", "Filter", "Decode", "Mask", "SMask"];
+      "BitsPerComponent", "Filter", "Decode"];
+    // An indirect soft-mask reference is legitimately renumbered by
+    // pdf-lib.copyPages(). Compare the resolved mask bytes and metadata,
+    // never the incidental object reference number.
+    const softMaskRef = value.dict.get(PDFName.of("SMask"));
+    const softMask = softMaskRef ? document.context.lookup(softMaskRef) : undefined;
+    assert.ok(!softMaskRef || softMask instanceof PDFRawStream,
+      "a referenced alpha mask must resolve to a native image stream");
+    const maskStream = softMask instanceof PDFRawStream ? softMask : null;
+    const maskKeys = ["Type", "Subtype", "Width", "Height", "ColorSpace",
+      "BitsPerComponent", "Filter"];
     return [{
       alias: alias.toString(),
       stream: Buffer.from(value.getContents()).toString("base64"),
       dictionary: Object.fromEntries(fields.map(name =>
         [name, value.dict.get(PDFName.of(name))?.toString() ?? null])),
+      softMask: maskStream ? {
+        bytes: Buffer.from(maskStream.getContents()).toString("base64"),
+        dictionary: Object.fromEntries(maskKeys.map(name =>
+          [name, maskStream.dict.get(PDFName.of(name))?.toString() ?? null])),
+      } : null,
     }];
   });
   assert.ok(images.length > 0, "actual image streams must be present");
