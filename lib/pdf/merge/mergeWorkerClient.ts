@@ -60,7 +60,13 @@ export function mergePdfInBackground(
     worker.onmessage = ({ data }: MessageEvent<WorkerMessage>) => {
       if (settled) return;
       if (data.type === "progress") {
-        onProgress(data.completed, data.total);
+        try {
+          onProgress(data.completed, data.total);
+        } catch {
+          // A UI callback must not strand a live Worker until the four-minute
+          // watchdog expires. Release the Worker and reject atomically.
+          if (finish()) reject(new Error("Merge progress could not be reported safely."));
+        }
       } else if (data.type === "result") {
         if (finish()) resolve(data.value);
       } else if (data.type === "error") {

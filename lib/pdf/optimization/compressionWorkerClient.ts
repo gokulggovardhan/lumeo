@@ -59,7 +59,13 @@ export function compressPdfInBackground(
     worker.onmessage = ({ data }: MessageEvent<PdfCompressionWorkerMessage>) => {
       if (settled) return;
       if (data.type === "progress") {
-        onProgress(data.value, data.stage);
+        try {
+          onProgress(data.value, data.stage);
+        } catch {
+          // Never leak a local compression Worker when the UI progress
+          // observer fails. Do not include callback details or PDF contents.
+          if (finish()) reject(new Error("Compression progress could not be reported safely."));
+        }
       } else if (data.type === "result") {
         if (finish()) resolve(data.value);
       } else if (data.type === "error") {
