@@ -106,7 +106,9 @@ for (const width of [320, 360, 390, 393, 414, 430]) {
   test(`workspace has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/heic-to-jpeg");
-    await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
+    // Responsive layouts may render two labels for the same input with one
+    // intentionally hidden. Assert the real visible upload affordance only.
+    await expect(page.locator('label[for="heic-photo-upload"]:visible').first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }
@@ -193,6 +195,12 @@ test("batch controls remove a selected file and convert-more resets cleanly", as
 
 test("unsupported drop is explained instead of disappearing silently", async ({ page }) => {
   await page.goto("/heic-to-jpeg");
+  // A synthetic drag event does not replay if emitted before React has
+  // attached the upload handler. Use the same readiness contract as the
+  // passing multi-photo drag test; do not weaken the error assertion.
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    "data-upload-client-ready", "true", { timeout: 20_000 },
+  );
   await page.locator(".l2-upload-stage").evaluate((element) => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(["not an image"], "notes.txt", { type: "text/plain" }));
