@@ -291,13 +291,19 @@ export default function MergePdfTool() {
   const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
   const [showOutputOptions, setShowOutputOptions] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [thumbnailRefreshToken, setThumbnailRefreshToken] = useState(0);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const thumbnailUrlsRef = useRef<Record<string, string>>({});
   const thumbnailSignatureRef = useRef<Record<string, string>>({});
+  const desiredThumbnailSignatureRef = useRef<Record<string, string>>({});
+  const thumbnailMountedRef = useRef(true);
   const renderingThumbnailIdsRef = useRef<Set<string>>(new Set());
   const previewUrlRef = useRef("");
   const previewSessionRef = useRef(0);
+  const previewDialogRef = useRef<HTMLDivElement | null>(null);
+  const previewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previewReturnFocusRef = useRef<HTMLElement | null>(null);
   const mergeAbortRef = useRef<AbortController | null>(null);
   const [mergeProgress, setMergeProgress] = useState(0);
   const [mergeProgressLabel, setMergeProgressLabel] = useState("");
@@ -354,6 +360,11 @@ export default function MergePdfTool() {
   // changes) and drops thumbnails for files no longer selected.
   useEffect(() => {
     const currentIds = new Set(files.map((item) => item.id));
+    // Track the latest desired rotation independently from in-flight render
+    // closures. A cancelled or outdated result can never replace a newer one.
+    desiredThumbnailSignatureRef.current = Object.fromEntries(
+      files.map((item) => [item.id, `${item.id}:${item.rotation}`]),
+    );
 
     for (const id of Object.keys(thumbnailUrlsRef.current)) {
       if (!currentIds.has(id)) {
@@ -369,17 +380,9 @@ export default function MergePdfTool() {
       }
     }
 
-    // Only re-render a file's thumbnail when that file's own id:rotation
-    // signature changed, not whenever any file in the list changes rotation.
-    // File ids are globally unique (createFileId mixes in a random UUID), so
-    // a render that resolves after this effect's cleanup has already fired
-    // (React Strict Mode intentionally does mount-cleanup-mount in dev, and
-    // concurrent rendering can do similar re-runs in production) is still
-    // valid to apply -- there is no "stale" id it could clobber. The
-    // signature is recorded only on success, so a render that never
-    // completes (StrictMode's discarded first pass, or a thrown error)
-    // simply gets retried on the next effect run instead of being silently
-    // marked "done" while no thumbnail was ever produced.
+    // Only re-render when id:rotation changes. In-flight renders can finish
+    // after a second rotation or file removal: discard those blob URLs and
+    // schedule the newest thumbnail once the old render slot is released.
     for (const item of files) {
       const signature = `${item.id}:${item.rotation}`;
       if (thumbnailSignatureRef.current[item.id] === signature) continue;
@@ -390,6 +393,11 @@ export default function MergePdfTool() {
         try {
           const url = await renderPdfPageToBlobUrl(item.file, 0.24, item.rotation);
           if (!url) return;
+          if (!thumbnailMountedRef.current ||
+              desiredThumbnailSignatureRef.current[item.id] !== signature) {
+            URL.revokeObjectURL(url);
+            return;
+          }
           const previous = thumbnailUrlsRef.current[item.id];
           if (previous) URL.revokeObjectURL(previous);
           thumbnailUrlsRef.current[item.id] = url;
@@ -400,13 +408,21 @@ export default function MergePdfTool() {
           // one -- signature stays unmarked so it's retried next effect run.
         } finally {
           renderingThumbnailIdsRef.current.delete(item.id);
+          // The rotation may have changed while this render was in-flight.
+          // A fresh effect is needed because the earlier effect saw it busy.
+          const latest = desiredThumbnailSignatureRef.current[item.id];
+          if (thumbnailMountedRef.current && latest && latest !== signature) {
+            setThumbnailRefreshToken((count) => count + 1);
+          }
         }
       })();
     }
-  }, [files]);
+  }, [files, thumbnailRefreshToken]);
 
   useEffect(() => {
+    thumbnailMountedRef.current = true;
     return () => {
+      thumbnailMountedRef.current = false;
       Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
       thumbnailUrlsRef.current = {};
     };
@@ -420,7 +436,11 @@ export default function MergePdfTool() {
     void (async () => {
       try {
         const url = await renderPdfPageToBlobUrl(previewFile.file, 1.1, previewFile.rotation);
-        if (cancelled || session !== previewSessionRef.current || !url) return;
+        if (!url) return;
+        if (cancelled || session !== previewSessionRef.current) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
         previewUrlRef.current = url;
         setPreviewUrl(url);
@@ -442,6 +462,9 @@ export default function MergePdfTool() {
   }, []);
 
   const openPreview = (id: string) => {
+    // Restore focus to the exact preview control when its modal closes.
+    previewReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = "";
@@ -458,6 +481,41 @@ export default function MergePdfTool() {
     setPreviewUrl("");
     setPreviewFileId(null);
   };
+
+  // A true modal must focus a control on entry, trap Tab/Shift+Tab,
+  // handle Escape even when focus moves, and return focus to its opener.
+  useEffect(() => {
+    if (!previewFileId) return;
+    const opener = previewReturnFocusRef.current;
+    previewCloseButtonRef.current?.focus();
+    const onPreviewKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePreview();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = previewDialogRef.current;
+      if (!dialog) return;
+      const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>("button:not([disabled])"));
+      if (buttons.length === 0) return;
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onPreviewKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onPreviewKeyDown);
+      if (opener?.isConnected) opener.focus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewFileId]);
 
   useEffect(() => {
     const shouldAttempt = shouldAttemptOnce({
@@ -1266,14 +1324,12 @@ export default function MergePdfTool() {
 
       {previewFile ? (
         <div
+          ref={previewDialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${previewFile.file.name} preview`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--v2-surface-overlay)] p-6"
           onClick={closePreview}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") closePreview();
-          }}
         >
           <div
             className="relative flex max-h-full max-w-full flex-col items-center gap-3"
@@ -1306,6 +1362,7 @@ export default function MergePdfTool() {
                 ↺
               </button>
               <button
+                ref={previewCloseButtonRef}
                 type="button"
                 onClick={closePreview}
                 className="rounded-full border border-[var(--text-primary)]/20 bg-[var(--atelier-surface-1)]/90 px-4 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"

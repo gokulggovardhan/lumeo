@@ -547,3 +547,41 @@ test("Merge PDF optional smart optimisation uses shared worker without changing 
   expect(pageTexts[0]).toContain("SHARED MERGE ALPHA");
   expect(pageTexts[1]).toContain("SHARED MERGE BETA");
 });
+
+test("Phase 09 Merge PDF preview keeps focus inside the dialog and returns it on Escape", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  pdf.addPage([350, 480]).drawText("KEYBOARD PREVIEW FIDELITY", {
+    x: 24, y: 420, size: 14, font,
+  });
+  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles({
+    name: "keyboard-merge.pdf", mimeType: "application/pdf",
+    buffer: Buffer.from(await pdf.save()),
+  });
+  const opener = page.getByRole("button", { name: "Preview keyboard-merge.pdf" });
+  await expect(opener).toBeVisible({ timeout: 30_000 });
+  await opener.focus();
+  await opener.press("Enter");
+
+  const dialog = page.getByRole("dialog", { name: "keyboard-merge.pdf preview" });
+  await expect(dialog).toBeVisible();
+  const close = dialog.getByRole("button", { name: "Close", exact: true });
+  const rotateRight = dialog.getByRole("button", { name: "Rotate keyboard-merge.pdf right" });
+  const rotateLeft = dialog.getByRole("button", { name: "Rotate keyboard-merge.pdf left" });
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(rotateRight).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(rotateLeft).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(rotateRight).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
+});
