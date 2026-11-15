@@ -95,7 +95,12 @@ jobs:
 
           for route in "${routes[@]}"; do
             status_code="$(
-              curl                 --location                 --silent                 --show-error                 --output /dev/null                 --write-out "%{http_code}"                 --max-time 30                 "$base_url$route"
+              # Do not follow 30x redirects: a public Merge/Compress route
+              # redirected to login or a fallback page must fail the 200 gate.
+              curl --silent --show-error --output /dev/null \
+                --write-out "%{http_code}" \
+                --max-time 30 --max-redirs 0 \
+                "$base_url$route"
             )"
 
             if [ "$status_code" != "200" ]; then
