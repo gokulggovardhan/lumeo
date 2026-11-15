@@ -63,7 +63,7 @@ test("Phase 14 refuses comment-only, self-approval and stale-commit approvals", 
 });
 
 test("Phase 14 rejects stale main base, draft, check failure and untrusted integration", () => {
-  for (const patch of [
+  const mutations: Array<(f: ReturnType<typeof fixture>) => void> = [
     (f) => { f.pr.base.sha = "c".repeat(40); },
     (f) => { f.pr.draft = true; },
     (f) => { f.checkRuns[0].conclusion = "failure"; },
@@ -72,7 +72,8 @@ test("Phase 14 rejects stale main base, draft, check failure and untrusted integ
     (f) => { Object.assign(f.ruleset, { bypass_actors: [{ actor_id: 1 }] }); },
     (f) => { f.ruleset.rules[1].parameters.strict_required_status_checks_policy = false; },
     (f) => { f.ruleset.rules[0].parameters.allowed_merge_methods = ["squash", "merge"]; },
-  ]) {
+  ];
+  for (const patch of mutations) {
     const f = fixture();
     patch(f);
     assert.equal(assessProtectedMergeReadiness(f).safe, false);
