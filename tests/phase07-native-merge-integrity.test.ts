@@ -411,19 +411,24 @@ test("Phase 07 malformed image soft-mask reference fails closed without changing
     "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8DwHwjrGcD0f4YTAD2YB0LLpftwAAAAAElFTkSuQmCC", "base64"));
   const page = source.addPage([250, 300]);
   page.drawImage(png, { x: 20, y: 30, width: 120, height: 120 });
-  const xObjects = page.node.Resources()?.lookup(PDFName.of("XObject"));
+  // pdf-lib defers PNG stream registration until save()/flush(). Reopen the
+  // serialized fixture before editing the actual native image resource.
+  const firstPass = bufferOf(await source.save());
+  const editable = await PDFDocument.load(firstPass.slice(0));
+  const xObjects = editable.getPage(0).node.Resources()?.lookup(PDFName.of("XObject"));
   assert.ok(xObjects instanceof PDFDict, "PNG must create native image resources");
   const images = xObjects.entries().flatMap(([, ref]) => {
-    const value = source.context.lookup(ref);
+    const value = editable.context.lookup(ref);
     return value instanceof PDFRawStream && value.dict.lookup(PDFName.of("Subtype"))?.toString() === "/Image"
       ? [value] : [];
   });
-  assert.ok(images.length > 0, "fixture must contain an Image XObject");
+  assert.ok(images.length > 0, "serialized fixture must contain an Image XObject");
   assert.ok(images[0].dict.get(PDFName.of("SMask")), "fixture must start with a real PNG alpha mask");
-  // Deliberately corrupt only the mask reference. The PDF is parseable but
-  // unsafe to copy; preflight must reject rather than silently preserve it.
-  images[0].dict.set(PDFName.of("SMask"), PDFName.of("NotAnImageStream"));
-  const bytes = bufferOf(await source.save());
+  // An indirect reference resolving to a dictionary (not an Image stream)
+  // is invalid, unlike legacy direct /SMask names retained by Phase 3.
+  const nonStreamMask = editable.context.register(editable.context.obj({ Type: "XObject", Subtype: "Image" }));
+  images[0].dict.set(PDFName.of("SMask"), nonStreamMask);
+  const bytes = bufferOf(await editable.save());
   const snapshot = new Uint8Array(bytes.slice(0));
   const parsed = await PDFDocument.load(bytes.slice(0));
   const structure = inspectPdfStructure(parsed);

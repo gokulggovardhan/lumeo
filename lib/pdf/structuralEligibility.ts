@@ -203,16 +203,17 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
       }
       const kind = nameOf(resolve(stream.dict.get(PDFName.of("Subtype")), context));
       if (kind === "Image") {
-        // A soft mask must be an Image XObject, not an unresolved reference
-        // or an arbitrary PDF object. Preserve the defined /None sentinel.
-        // Copying an invalid mask can otherwise produce a subtly damaged PDF.
+        // Preserve legacy direct /SMask names as opaque image metadata:
+        // the existing Phase 3 contract handles them without discarding
+        // otherwise copyable pages, while excluding them from JPEG transcode.
+        // An *indirect* mask must actually resolve to an Image XObject stream;
+        // a dangling or dictionary-only reference is not safe to copy.
         const softMaskValue = stream.dict.get(PDFName.of("SMask"));
-        if (softMaskValue) {
+        if (softMaskValue instanceof PDFRef) {
           const mask = resolve(softMaskValue, context);
-          if (nameOf(mask) !== "None" &&
-              (!(mask instanceof PDFRawStream) ||
-                nameOf(resolve(mask.dict.get(PDFName.of("Subtype")), context)) !== "Image")) {
-            unsafe.add("A PDF image soft mask XObject could not be resolved.");
+          if (!(mask instanceof PDFRawStream) ||
+              nameOf(resolve(mask.dict.get(PDFName.of("Subtype")), context)) !== "Image") {
+            unsafe.add("A PDF image soft mask XObject reference could not be resolved.");
           }
         }
         page.imageResources += 1;
