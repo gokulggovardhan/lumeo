@@ -57,7 +57,8 @@ export function assessProtectedMergeReadiness({ pr, reviews, checkRuns, ruleset,
   }
   const author = pr?.user?.login?.toLowerCase();
   const approved = [...reviewByAuthor.entries()].filter(([reviewer, review]) =>
-    reviewer !== author && !review.user?.type?.endsWith("[bot]") &&
+    reviewer !== author && review.user?.type === "User" &&
+    !review.user?.login?.toLowerCase().endsWith("[bot]") &&
     review.state === "APPROVED" && review.commit_id === head
   );
   if (approved.length < 1) {
@@ -88,17 +89,16 @@ async function main() {
     throw new Error("Set GITHUB_REPOSITORY, LUMEO_PR_NUMBER and read-only GITHUB_TOKEN for Phase 14 preflight.");
   }
   const api = `https://api.github.com/repos/${repo}`;
-  const [pr, mainBranch, runs, reviewEvents, rulesets] = await Promise.all([
+  const [pr, mainBranch, reviewEvents, rulesets] = await Promise.all([
     fetchGitHubJson(`${api}/pulls/${prNumber}`, token),
     fetchGitHubJson(`${api}/branches/main`, token),
-    fetchGitHubJson(`${api}/pulls/${prNumber}/commits?per_page=1`, token),
     fetchGitHubJson(`${api}/pulls/${prNumber}/reviews?per_page=100`, token),
     fetchGitHubJson(`${api}/rulesets?includes_parents=true`, token),
   ]);
   // A large review history requires complete pagination to avoid falsely
   // regarding an incomplete partial history as authoritative.
   if (reviewEvents.length >= 100) throw new Error("More than 99 reviews: paginate before evaluating independent approval.");
-  if (pr.head?.sha !== runs.at(-1)?.sha) throw new Error("PR head changed while reviewing its commit list.");
+  if (!SHA_PATTERN.test(pr.head?.sha ?? "")) throw new Error("PR head SHA is invalid.");
   const policy = rulesets.find((entry) =>
     entry.name === "Protect main" && entry.enforcement === "active");
   if (!policy) throw new Error("Active Protect main ruleset not found.");

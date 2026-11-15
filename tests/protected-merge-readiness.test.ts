@@ -54,7 +54,10 @@ test("Phase 14 refuses comment-only, self-approval and stale-commit approvals", 
     { state: "APPROVED", commit_id: "c".repeat(40), user: { login: "reviewer" } },
   ]) {
     const f = fixture();
-    f.reviews = [{ ...review, submitted_at: "2026-11-15T05:00:00Z" }];
+    f.reviews.splice(0, f.reviews.length, {
+      ...review, submitted_at: "2026-11-15T05:00:00Z",
+      user: { ...review.user, type: "User" },
+    });
     assert.equal(assessProtectedMergeReadiness(f).safe, false);
   }
 });
@@ -66,7 +69,7 @@ test("Phase 14 rejects stale main base, draft, check failure and untrusted integ
     (f) => { f.checkRuns[0].conclusion = "failure"; },
     (f) => { f.checkRuns[0].head_sha = "c".repeat(40); },
     (f) => { f.checkRuns[0].app.id = 123; },
-    (f) => { f.ruleset.bypass_actors = [{ actor_id: 1 }]; },
+    (f) => { Object.assign(f.ruleset, { bypass_actors: [{ actor_id: 1 }] }); },
     (f) => { f.ruleset.rules[1].parameters.strict_required_status_checks_policy = false; },
     (f) => { f.ruleset.rules[0].parameters.allowed_merge_methods = ["squash", "merge"]; },
   ]) {
