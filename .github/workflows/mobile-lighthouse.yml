@@ -12,6 +12,7 @@ on:
       - "worker/**"
       - "scripts/run-mobile-lighthouse.mjs"
       - ".lighthouserc.cjs"
+      - "tests/phase07-native-merge-integrity.test.ts"
       - ".github/workflows/mobile-lighthouse.yml"
       - ".github/workflows/workspace-production-certification.yml"
       - "tests/mobile-lighthouse-contract.test.ts"

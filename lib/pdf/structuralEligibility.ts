@@ -203,6 +203,19 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
       }
       const kind = nameOf(resolve(stream.dict.get(PDFName.of("Subtype")), context));
       if (kind === "Image") {
+        // Preserve legacy direct /SMask names as opaque image metadata:
+        // the existing Phase 3 contract handles them without discarding
+        // otherwise copyable pages, while excluding them from JPEG transcode.
+        // An *indirect* mask must actually resolve to an Image XObject stream;
+        // a dangling or dictionary-only reference is not safe to copy.
+        const softMaskValue = stream.dict.get(PDFName.of("SMask"));
+        if (softMaskValue instanceof PDFRef) {
+          const mask = resolve(softMaskValue, context);
+          if (!(mask instanceof PDFRawStream) ||
+              nameOf(resolve(mask.dict.get(PDFName.of("Subtype")), context)) !== "Image") {
+            unsafe.add("A PDF image soft mask XObject reference could not be resolved.");
+          }
+        }
         page.imageResources += 1;
         if (images.has(objectRef)) continue;
         const encoding = filterName(stream.dict.get(PDFName.of("Filter")), context);
@@ -218,8 +231,17 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
         seenForms.add(objectRef);
         totalFormXObjects += 1;
         const nested = stream.dict.get(PDFName.of("Resources"));
-        // A Form can inherit page resources when no local Resources exist.
-        if (nested) visitResources(asDict(nested, context), page, depth + 1);
+        // A Form can inherit page resources only when no local Resources exist.
+        // An explicitly present but malformed /Resources dictionary is unsafe:
+        // do not silently treat it as missing and approve an invalid XObject.
+        if (nested) {
+          const nestedResources = asDict(nested, context);
+          if (!nestedResources) {
+            unsafe.add("A Form XObject resource dictionary could not be resolved.");
+          } else {
+            visitResources(nestedResources, page, depth + 1);
+          }
+        }
       } else {
         // Do not guess how PostScript, image alternates, or unknown XObject
         // programs should be serialized or preserved under an embedding.

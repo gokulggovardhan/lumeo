@@ -11,6 +11,7 @@ on:
       - "public/**"
       - "worker/**"
       - "scripts/run-accessibility-audit.mjs"
+      - "tests/phase07-native-merge-integrity.test.ts"
       - "tests/accessibility-automation-contract.test.ts"
       - ".github/workflows/accessibility.yml"
       - "package.json"
