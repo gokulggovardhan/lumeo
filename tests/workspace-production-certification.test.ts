@@ -73,3 +73,18 @@ test("production certification includes a live connected Workspace mutation and 
   assert.match(productionSmoke, /Download PDF/);
   assert.match(productionSmoke, /getRotation\(\)\.angle/);
 });
+
+test("Phase 15 production route smoke refuses redirects to unrelated HTTP 200 pages", () => {
+  const begin = workflow.indexOf("- name: Verify connected Workspace production routes");
+  const end = workflow.indexOf("- name: Verify production Admin boundary", begin);
+  assert.ok(begin >= 0 && end > begin, "expected live public-route health check must exist");
+  const smoke = workflow.slice(begin, end);
+  assert.match(smoke, /"\/pdf\/merge"/);
+  assert.match(smoke, /"\/pdf\/compress"/);
+  assert.match(smoke, /--max-redirs 0/);
+  assert.doesNotMatch(smoke, /--location|--location-trusted|--follow/);
+  assert.match(smoke, /if \[ "\$status_code" != "200" \]/);
+  assert.match(smoke, /exit 1/);
+  // A 302 Location: /admin/login must never be reported as route HTTP 200
+  // simply because the client followed the redirect automatically.
+});
