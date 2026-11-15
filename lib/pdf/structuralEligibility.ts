@@ -245,6 +245,12 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
       if (info.rotation === null || !Number.isInteger(info.rotation) || info.rotation % 90 !== 0) {
         unsafe.add("A PDF page has an unsupported rotation.");
       }
+      // Page-level /AA is distinct from a catalog /OpenAction or /AA:
+      // it can execute on page open/close without an annotation. A native
+      // page-copy must never silently preserve or strip those actions.
+      if (page.node.has(PDFName.of("AA"))) {
+        protectedFeatures.add("PageAdditionalActions");
+      }
       const annots = page.node.Annots();
       info.annotationCount = annots?.size() ?? 0;
       if (info.annotationCount > 0) protectedFeatures.add("PageAnnotations");
