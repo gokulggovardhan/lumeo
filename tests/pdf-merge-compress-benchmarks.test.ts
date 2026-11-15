@@ -161,3 +161,37 @@ test("benchmark rotated native merge: text fidelity, exact page count and page-s
     { pages: 5, nativeRotation: 90, textPreserved: true,
       note: "merge sizes compare sum of source PDFs, not compression quality" });
 });
+
+test("Phase 13 representative 48-page native merge benchmark retains searchable multi-document page order", async () => {
+  // Representative documents are generated deterministically and contain real
+  // text operators; this does NOT substitute for private customer document QA.
+  const first = await makeTextPages(28, "PHASE13 REPORT");
+  const second = await makeTextPages(20, "PHASE13 APPENDIX");
+  const firstSnapshot = new Uint8Array(first.slice(0));
+  const secondSnapshot = new Uint8Array(second.slice(0));
+  const inputBytes = first.byteLength + second.byteLength;
+  const start = performance.now();
+  const heapStart = process.memoryUsage().heapUsed;
+  const merged = await mergeNativeDocuments([
+    { name: "representative-report.pdf", bytes: first, rotation: 90 },
+    { name: "representative-appendix.pdf", bytes: second, rotation: 0 },
+  ], { format: "original", marginPoints: 0 });
+  const output = await PDFDocument.load(merged.bytes);
+  assert.equal(merged.pageCount, 48);
+  assert.equal(output.getPageCount(), 48);
+  assert.equal(output.getPage(0).getRotation().angle, 90);
+  assert.deepEqual(output.getPage(0).getSize(), { width: 420, height: 620 });
+  assert.deepEqual(output.getPage(28).getSize(), { width: 420, height: 620 });
+  assert.equal(output.getPage(28).getRotation().angle, 0);
+  const text = await extractAllText(merged.bytes);
+  assert.ok(text.includes("PHASE13 REPORT PAGE 28"), "report last page survives");
+  assert.ok(text.includes("PHASE13 APPENDIX PAGE 20"), "appendix last page survives");
+  assert.ok(text.indexOf("PHASE13 REPORT PAGE 28") < text.indexOf("PHASE13 APPENDIX PAGE 1"),
+    "multi-file page ordering is immutable");
+  assert.deepEqual(new Uint8Array(first), firstSnapshot);
+  assert.deepEqual(new Uint8Array(second), secondSnapshot);
+  benchmarkRecord("48-page-native-merge-representative-generated", start,
+    inputBytes, merged.bytes.byteLength, heapStart,
+    { pages: 48, pageOrderVerified: true, nativeTextPreserved: true,
+      limits: "observed wall time and heap delta; no universal performance guarantee" });
+});

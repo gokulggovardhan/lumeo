@@ -547,3 +547,67 @@ test("Merge PDF optional smart optimisation uses shared worker without changing 
   expect(pageTexts[0]).toContain("SHARED MERGE ALPHA");
   expect(pageTexts[1]).toContain("SHARED MERGE BETA");
 });
+
+test("Phase 13 cross-browser five-page native Merge preserves invoice and report text, geometry and order", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const createDocument = async (label: string, count: number, size: [number, number]) => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    for (let i = 0; i < count; i++) {
+      const sheet = pdf.addPage(size);
+      sheet.drawText(`${label} SHEET ${i + 1}`, { x: 32, y: size[1] - 75, size: 14, font });
+      for (let line = 0; line < 8; line++) {
+        sheet.drawText(`LINE ${line + 1} / DOC ${label}`, {
+          x: 32, y: size[1] - 120 - line * 24, size: 10, font,
+        });
+      }
+    }
+    return Buffer.from(await pdf.save({ useObjectStreams: false }));
+  };
+  const report = await createDocument("REPORT", 3, [420, 600]);
+  const invoice = await createDocument("INVOICE", 2, [612, 792]);
+  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles([
+    { name: "report.pdf", mimeType: "application/pdf", buffer: report },
+    { name: "invoice.pdf", mimeType: "application/pdf", buffer: invoice },
+  ]);
+  const moveInvoice = page.getByRole("button", { name: "Move invoice.pdf up" });
+  await expect(moveInvoice).toBeVisible({ timeout: 30_000 });
+  await moveInvoice.click();
+  const rotateReport = page.getByRole("button", { name: "Rotate report.pdf right" });
+  await expect(rotateReport).toBeAttached({ timeout: 30_000 });
+  await rotateReport.click();
+  await page.getByRole("button", { name: "Merge PDFs", exact: true }).click();
+  const downloadButton = page.getByRole("button", { name: "Download merged PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const pending = page.waitForEvent("download");
+  await downloadButton.click();
+  const saved = await pending;
+  const result = await readFile((await saved.path())!);
+  const merged = await PDFDocument.load(result);
+  expect(merged.getPageCount()).toBe(5);
+  expect(merged.getPages().map((sheet) => sheet.getSize())).toEqual([
+    { width: 612, height: 792 }, { width: 612, height: 792 },
+    { width: 420, height: 600 }, { width: 420, height: 600 },
+    { width: 420, height: 600 },
+  ]);
+  expect(merged.getPages().map((sheet) => sheet.getRotation().angle)).toEqual([0, 0, 90, 90, 90]);
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: new Uint8Array(result), useSystemFonts: true });
+  try {
+    const document = await task.promise;
+    const labels = [];
+    for (let i = 1; i <= document.numPages; i++) {
+      const content = await (await document.getPage(i)).getTextContent();
+      labels.push(content.items.map(item => "str" in item ? item.str : "").join(" "));
+    }
+    expect(labels[0]).toContain("INVOICE SHEET 1");
+    expect(labels[1]).toContain("INVOICE SHEET 2");
+    expect(labels[2]).toContain("REPORT SHEET 1");
+    expect(labels[4]).toContain("REPORT SHEET 3");
+  } finally {
+    await task.destroy();
+  }
+});
