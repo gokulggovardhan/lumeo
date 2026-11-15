@@ -134,3 +134,35 @@ test("Phase 3: actual serialized native Merge and Compress maintain output parse
   assert.ok(compressed.outputBytes <= merged.bytes.byteLength);
   assert.equal((await PDFDocument.load(compressed.bytes)).getPageCount(), 2);
 });
+
+test("Phase 12: page-level additional actions fail closed without exposing JavaScript or mutating PDFs", async () => {
+  const actionPdf = await nativeFixture();
+  actionPdf.getPage(0).node.set(PDFName.of("AA"), actionPdf.context.obj({
+    O: { S: PDFName.of("JavaScript"), JS: "private-page-open-action()" },
+  }));
+  const original = arrayBuffer(await actionPdf.save());
+  const snapshot = new Uint8Array(original.slice(0));
+  const reparsed = await PDFDocument.load(original.slice(0));
+  const inspection = inspectPdfStructure(reparsed);
+  assert.equal(inspection.safeForMerge, false);
+  assert.equal(inspection.safeForCompression, false);
+  assert.ok(inspection.protectedFeatures.includes("PageAdditionalActions"));
+  assert.equal(JSON.stringify(inspection).includes("private-page-open-action"), false,
+    "no page action or document content may appear in inspection results");
+  assert.equal(inspection.pages[0].annotationCount, 0,
+    "an /AA entry must remain protected even when there are no annotations");
+  const normal = arrayBuffer(await (await nativeFixture()).save());
+  await assert.rejects(
+    mergeNativeDocuments([
+      { name: "page-action.pdf", bytes: original, rotation: 0 },
+      { name: "clean.pdf", bytes: normal, rotation: 0 },
+    ], { format: "original", marginPoints: 0 }),
+    /protected or interactive document structure/,
+  );
+  const optimized = await optimizeNativePdfImages(original, "maximum", { dpi: 120, quality: 0.6 });
+  assert.equal(optimized.applied, false, "protected source must not be optimized");
+  assert.deepEqual(new Uint8Array(optimized.bytes), snapshot,
+    "protected source must be kept byte-for-byte original");
+  assert.deepEqual(new Uint8Array(original), snapshot,
+    "rejection cannot mutate source input bytes");
+});
