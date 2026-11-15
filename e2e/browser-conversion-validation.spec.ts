@@ -1680,3 +1680,37 @@ test.describe("browser conversion validation lab", () => {
     await context.close();
   });
 });
+
+test("Phase 10 Compress PDF applies a post-compression filename edit without rebuilding the PDF", async ({ page }) => {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  pdf.addPage([300, 420]).drawText("COMPRESS RENAMING SHOULD NOT RECOMPRESS", {
+    x: 25, y: 355, size: 12, font,
+  });
+  await page.goto("/pdf/compress", { waitUntil: "domcontentloaded" });
+  const upload = page.locator('input[type="file"][data-upload-client-ready="true"]').first();
+  await expect(upload).toBeAttached({ timeout: 30_000 });
+  await upload.setInputFiles({
+    name: "before-compression.pdf", mimeType: "application/pdf",
+    buffer: Buffer.from(await pdf.save()),
+  });
+  const action = page.getByRole("button", { name: "Compress PDF", exact: true });
+  await expect(action).toBeVisible({ timeout: 90_000 });
+  await action.click();
+  const downloadButton = page.getByRole("button", { name: /Download (compressed|unchanged original) PDF/ });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+
+  const outputName = page.getByLabel("Output file name");
+  await outputName.fill("renamed-after-compression.pdf");
+  await expect(page.getByText("Download as renamed-after-compression.pdf. Renaming does not rerun compression."))
+    .toBeVisible();
+  // The validated PDF and ready download remain available after the rename.
+  await expect(downloadButton).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("renamed-after-compression.pdf");
+  const bytes = await readFile((await download.path())!);
+  const result = await PDFDocument.load(bytes);
+  expect(result.getPageCount()).toBe(1);
+});

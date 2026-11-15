@@ -1604,7 +1604,9 @@ export default function CompressPdfTool() {
   function handleDownload() {
     if (!result) return;
     track({ eventName: "download_started", toolSlug: "compress" });
-    downloadUrl(result.url, result.fileName);
+    // Use the current sanitized output name, not the name captured at the
+    // time compression finished. Renaming must never require re-encoding.
+    downloadUrl(result.url, outputFileName);
     const timer = window.setTimeout(() => {
       clearResult("Temporary file cleared from this session.");
       setStatus("Ready");
@@ -2063,6 +2065,11 @@ export default function CompressPdfTool() {
                   Output file name
                   <input value={outputName} onChange={(event) => setOutputName(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 text-sm font-semibold normal-case tracking-normal text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/25 focus:border-[var(--lumeo-gold)]/45" />
                 </label>
+                {result ? (
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                    Download as {outputFileName}. Renaming does not rerun compression.
+                  </p>
+                ) : null}
               </div>
 
               {error ? <div role="alert" className="mt-4 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-2 text-sm text-[var(--text-danger)]">{error}</div> : null}
@@ -2189,7 +2196,7 @@ export default function CompressPdfTool() {
       {result && workspaceSession ? (
         <ContinueWithPdf
           sourceArea="optimize"
-          fileName={result.fileName}
+          fileName={outputFileName}
           bytes={result.bytes}
           pageCount={result.pageCount}
           session={workspaceSession}
