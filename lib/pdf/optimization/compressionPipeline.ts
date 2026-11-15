@@ -27,6 +27,18 @@ export async function runNativeCompression(
   onProgress?: (value: number, stage: string) => void,
   settingsOverride?: NativeImageSettings,
 ): Promise<PdfCompressionResponse> {
+  // Validate the shared worker entrypoint before any PDF inspection,
+  // including protected-document early returns. The Merge and Compress UIs
+  // enforce the same target contract, but the worker must not trust callers.
+  if (goal === "target") {
+    if (typeof targetBytes !== "number" || !Number.isSafeInteger(targetBytes) ||
+        targetBytes < 20 * 1024) {
+      throw new Error("Choose a valid target size of at least 20 KB.");
+    }
+    if (targetBytes > 128 * 1024 * 1024) {
+      throw new Error("Choose a target no larger than 128 MB.");
+    }
+  }
   const inputBytes = originalBytes.byteLength;
   const codecAvailable =
     typeof OffscreenCanvas !== "undefined" &&
@@ -40,13 +52,17 @@ export async function runNativeCompression(
   let targetOutcome: TargetSearchOutcome | undefined;
   let attempts: TargetAttempt[] | undefined;
   if (lossless.protectedReason) {
+    // A structurally protected document must remain byte-for-byte original.
+    // If its untouched size already meets the valid target, report that
+    // truthfully; no-benefit applies only to a target that cannot be met.
+    const targetAchieved = goal === "target" ? lossless.bytes.byteLength <= (targetBytes ?? 0) : null;
     onProgress?.(100, "Original preserved for document safety");
     return {
       bytes: lossless.bytes,
       originalBytes: inputBytes,
       finalBytes: lossless.bytes.byteLength,
-      achieved: goal === "target" ? lossless.bytes.byteLength <= (targetBytes ?? 0) : null,
-      targetOutcome: goal === "target" ? "no-benefit" : undefined,
+      achieved: targetAchieved,
+      targetOutcome: goal === "target" ? (targetAchieved ? "achieved" : "no-benefit") : undefined,
       optimizedImages: 0,
       codecAvailable,
       protectedReason: lossless.protectedReason,
@@ -54,7 +70,9 @@ export async function runNativeCompression(
   }
 
   if (goal === "target") {
-    if (!Number.isSafeInteger(targetBytes) || !targetBytes || targetBytes < 20 * 1024) {
+    // Keep the local narrowing as a defensive invariant for this branch;
+    // the shared upper/lower bound is already checked before processing.
+    if (typeof targetBytes !== "number") {
       throw new Error("Choose a valid target size of at least 20 KB.");
     }
     if (lossless.outputBytes <= targetBytes) {
