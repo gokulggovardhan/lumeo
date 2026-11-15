@@ -404,3 +404,41 @@ test("Phase 07 refuses native merge of URL link annotations without losing any s
   assert.deepEqual(new Uint8Array(original), snapshot,
     "input URL link and all original source bytes must remain untouched");
 });
+
+test("Phase 07 malformed image soft-mask reference fails closed without changing the source", async () => {
+  const source = await PDFDocument.create();
+  const png = await source.embedPng(Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFUlEQVR4nGP4z8DwHwjrGcD0f4YTAD2YB0LLpftwAAAAAElFTkSuQmCC", "base64"));
+  const page = source.addPage([250, 300]);
+  page.drawImage(png, { x: 20, y: 30, width: 120, height: 120 });
+  const xObjects = page.node.Resources()?.lookup(PDFName.of("XObject"));
+  assert.ok(xObjects instanceof PDFDict, "PNG must create native image resources");
+  const images = xObjects.entries().flatMap(([, ref]) => {
+    const value = source.context.lookup(ref);
+    return value instanceof PDFRawStream && value.dict.lookup(PDFName.of("Subtype"))?.toString() === "/Image"
+      ? [value] : [];
+  });
+  assert.ok(images.length > 0, "fixture must contain an Image XObject");
+  assert.ok(images[0].dict.get(PDFName.of("SMask")), "fixture must start with a real PNG alpha mask");
+  // Deliberately corrupt only the mask reference. The PDF is parseable but
+  // unsafe to copy; preflight must reject rather than silently preserve it.
+  images[0].dict.set(PDFName.of("SMask"), PDFName.of("NotAnImageStream"));
+  const bytes = bufferOf(await source.save());
+  const snapshot = new Uint8Array(bytes.slice(0));
+  const parsed = await PDFDocument.load(bytes.slice(0));
+  const structure = inspectPdfStructure(parsed);
+  assert.equal(structure.safeForMerge, false, "malformed image soft mask must block merge");
+  assert.equal(structure.safeForCompression, false, "malformed image soft mask must block compression");
+  assert.ok(structure.unsupportedReasons.some(reason => reason.includes("soft mask")),
+    "structural report must explain the invalid mask without revealing PDF contents");
+
+  await assert.rejects(
+    mergeNativeDocuments([
+      { name: "invalid-mask.pdf", bytes, rotation: 0 },
+      { name: "plain.pdf", bytes: await fixture("PLAIN", [0]), rotation: 0 },
+    ], { format: "original", marginPoints: 0 }),
+    /unsupported page geometry or PDF resources/,
+    "an invalid image mask must never result in a downloadable merged PDF",
+  );
+  assert.deepEqual(new Uint8Array(bytes), snapshot, "rejected source bytes stay immutable");
+});

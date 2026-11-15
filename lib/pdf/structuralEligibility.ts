@@ -203,6 +203,18 @@ export function inspectPdfStructure(pdf: PDFDocument): PdfStructureInspection {
       }
       const kind = nameOf(resolve(stream.dict.get(PDFName.of("Subtype")), context));
       if (kind === "Image") {
+        // A soft mask must be an Image XObject, not an unresolved reference
+        // or an arbitrary PDF object. Preserve the defined /None sentinel.
+        // Copying an invalid mask can otherwise produce a subtly damaged PDF.
+        const softMaskValue = stream.dict.get(PDFName.of("SMask"));
+        if (softMaskValue) {
+          const mask = resolve(softMaskValue, context);
+          if (nameOf(mask) !== "None" &&
+              (!(mask instanceof PDFRawStream) ||
+                nameOf(resolve(mask.dict.get(PDFName.of("Subtype")), context)) !== "Image")) {
+            unsafe.add("A PDF image soft mask XObject could not be resolved.");
+          }
+        }
         page.imageResources += 1;
         if (images.has(objectRef)) continue;
         const encoding = filterName(stream.dict.get(PDFName.of("Filter")), context);
