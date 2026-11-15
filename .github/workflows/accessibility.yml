@@ -12,6 +12,8 @@ on:
       - "worker/**"
       - "scripts/run-accessibility-audit.mjs"
       - "tests/accessibility-automation-contract.test.ts"
+      - "tests/pdf-merge-compress-benchmarks.test.ts"
+      - "e2e/workspace-mobile.spec.ts"
       - ".github/workflows/accessibility.yml"
       - "package.json"
       - "package-lock.json"

@@ -12,6 +12,8 @@ on:
       - "worker/**"
       - "scripts/check-route-js-budget.mjs"
       - "tests/route-js-budget-contract.test.ts"
+      - "tests/pdf-merge-compress-benchmarks.test.ts"
+      - "e2e/workspace-mobile.spec.ts"
       - ".github/workflows/route-js-budget.yml"
       - ".github/workflows/workspace-production-certification.yml"
       - "package.json"
